@@ -1,23 +1,83 @@
 
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { Activity, AlertCircle, Calendar, FileText, Plus, User } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import DocumentList from '@/components/documents/DocumentList';
 import { toast } from 'sonner';
+import AddMedicalRecordForm from '@/components/medical/AddMedicalRecordForm';
+import { useMedicalRecords } from '@/hooks/use-medical-records';
+import { UserProfile, Allergy, MedicalCondition, Medication } from '@/types';
 
 const Dashboard: React.FC = () => {
+  const [isAddRecordModalOpen, setIsAddRecordModalOpen] = useState(false);
+  const { records, isLoading, addRecord, deleteRecord, refreshRecords } = useMedicalRecords();
+  const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
+  const [userType, setUserType] = useState<'individual' | 'organization'>('individual');
+
+  useEffect(() => {
+    // Check user type from localStorage
+    const storedUserType = localStorage.getItem('userType');
+    if (storedUserType === 'organization') {
+      setUserType('organization');
+    } else {
+      setUserType('individual');
+    }
+
+    // Load user profile from localStorage
+    const userData = localStorage.getItem('userData');
+    if (userData) {
+      try {
+        const parsedData = JSON.parse(userData);
+        // Extract relevant user data to construct a profile
+        const profile: UserProfile = {
+          id: parsedData.aadhaar || 'user-id',
+          name: parsedData.name || 'Unknown User',
+          dob: parsedData.dob || '',
+          gender: parsedData.gender || '',
+          bloodGroup: parsedData.bloodGroup || '',
+          height: parsedData.height ? Number(parsedData.height) : undefined,
+          weight: parsedData.weight ? Number(parsedData.weight) : undefined,
+          contact: parsedData.contact || '',
+          address: parsedData.address || '',
+          emergencyContacts: [{
+            name: parsedData.emergencyContactName || '',
+            relationship: parsedData.emergencyContactRelation || '',
+            contact: parsedData.emergencyContactNumber || ''
+          }],
+          allergies: parsedData.allergies || [],
+          medicalConditions: [],
+          currentMedications: []
+        };
+        setUserProfile(profile);
+      } catch (error) {
+        console.error('Error parsing user data:', error);
+      }
+    }
+  }, []);
+
   const handleAddRecord = () => {
-    toast.info('Add new medical record functionality');
+    setIsAddRecordModalOpen(true);
+  };
+
+  const handleRecordAdded = (newRecord) => {
+    addRecord(newRecord);
+    refreshRecords();
   };
 
   return (
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row gap-4 justify-between items-start">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">Medical Dashboard</h1>
-          <p className="text-gray-500 mt-1">Manage your medical records securely</p>
+          <h1 className="text-2xl font-bold text-gray-900">
+            {userType === 'organization' ? 'Hospital Dashboard' : 'Medical Dashboard'}
+          </h1>
+          <p className="text-gray-500 mt-1">
+            {userType === 'organization' 
+              ? 'Manage patient records and healthcare services' 
+              : 'Manage your medical records securely'}
+          </p>
         </div>
         <Button onClick={handleAddRecord}>
           <Plus className="mr-2 h-4 w-4" />
@@ -32,9 +92,9 @@ const Dashboard: React.FC = () => {
             <FileText className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">12</div>
+            <div className="text-2xl font-bold">{records.length}</div>
             <p className="text-xs text-muted-foreground">
-              +2 from last month
+              {records.length > 0 ? `Last added ${new Date(records[records.length - 1]?.date || Date.now()).toLocaleDateString()}` : 'No documents yet'}
             </p>
           </CardContent>
         </Card>
@@ -44,9 +104,11 @@ const Dashboard: React.FC = () => {
             <Activity className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">3</div>
+            <div className="text-2xl font-bold">
+              {records.filter(r => new Date(r.date) > new Date(Date.now() - 7 * 24 * 60 * 60 * 1000)).length}
+            </div>
             <p className="text-xs text-muted-foreground">
-              Last upload 2 days ago
+              In the last 7 days
             </p>
           </CardContent>
         </Card>
@@ -68,9 +130,9 @@ const Dashboard: React.FC = () => {
             <User className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">85%</div>
+            <div className="text-2xl font-bold">{userProfile ? '100%' : '85%'}</div>
             <div className="mt-2 h-2 w-full bg-gray-200 rounded-full overflow-hidden">
-              <div className="h-full bg-medimemo-primary rounded-full" style={{ width: '85%' }}></div>
+              <div className="h-full bg-medimemo-primary rounded-full" style={{ width: userProfile ? '100%' : '85%' }}></div>
             </div>
           </CardContent>
         </Card>
@@ -86,7 +148,7 @@ const Dashboard: React.FC = () => {
               </CardDescription>
             </CardHeader>
             <CardContent>
-              <DocumentList />
+              <DocumentList records={records} isLoading={isLoading} onDelete={deleteRecord} />
             </CardContent>
           </Card>
         </div>
@@ -166,32 +228,51 @@ const Dashboard: React.FC = () => {
             </CardHeader>
             <CardContent>
               <div className="space-y-4">
-                <div>
-                  <h4 className="text-xs font-medium text-gray-500">Blood Group</h4>
-                  <p className="text-sm font-medium">O Positive</p>
-                </div>
-                <div>
-                  <h4 className="text-xs font-medium text-gray-500">Allergies</h4>
-                  <div className="flex flex-wrap gap-1 mt-1">
-                    <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-red-100 text-red-800">
-                      Penicillin
-                    </span>
-                    <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-red-100 text-red-800">
-                      Peanuts
-                    </span>
-                  </div>
-                </div>
-                <div>
-                  <h4 className="text-xs font-medium text-gray-500">Chronic Conditions</h4>
-                  <div className="flex flex-wrap gap-1 mt-1">
-                    <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-blue-100 text-blue-800">
-                      Hypertension
-                    </span>
-                    <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-blue-100 text-blue-800">
-                      Type 2 Diabetes
-                    </span>
-                  </div>
-                </div>
+                {userProfile && (
+                  <>
+                    <div>
+                      <h4 className="text-xs font-medium text-gray-500">Blood Group</h4>
+                      <p className="text-sm font-medium">{userProfile.bloodGroup || 'Not specified'}</p>
+                    </div>
+                    <div>
+                      <h4 className="text-xs font-medium text-gray-500">Allergies</h4>
+                      {userProfile.allergies && userProfile.allergies.length > 0 ? (
+                        <div className="flex flex-wrap gap-1 mt-1">
+                          {userProfile.allergies.map((allergy, index) => (
+                            <span 
+                              key={index} 
+                              className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium
+                                ${allergy.severity === 'severe' ? 'bg-red-100 text-red-800' : 
+                                  allergy.severity === 'moderate' ? 'bg-orange-100 text-orange-800' : 
+                                    'bg-yellow-100 text-yellow-800'}`}
+                            >
+                              {allergy.name}
+                            </span>
+                          ))}
+                        </div>
+                      ) : (
+                        <p className="text-sm text-gray-500">No known allergies</p>
+                      )}
+                    </div>
+                    <div>
+                      <h4 className="text-xs font-medium text-gray-500">Chronic Conditions</h4>
+                      <div className="flex flex-wrap gap-1 mt-1">
+                        {userProfile.medicalConditions && userProfile.medicalConditions.length > 0 ? (
+                          userProfile.medicalConditions.map((condition, index) => (
+                            <span key={index} className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-blue-100 text-blue-800">
+                              {condition.name}
+                            </span>
+                          ))
+                        ) : (
+                          <p className="text-sm text-gray-500">No chronic conditions</p>
+                        )}
+                      </div>
+                    </div>
+                  </>
+                )}
+                {!userProfile && (
+                  <p className="text-sm text-gray-500 italic">Profile data not available</p>
+                )}
               </div>
             </CardContent>
             <CardFooter className="pt-0">
@@ -202,6 +283,13 @@ const Dashboard: React.FC = () => {
           </Card>
         </div>
       </div>
+      
+      {/* Add Medical Record Modal */}
+      <AddMedicalRecordForm 
+        isOpen={isAddRecordModalOpen} 
+        onClose={() => setIsAddRecordModalOpen(false)}
+        onAddRecord={handleRecordAdded}
+      />
     </div>
   );
 };

@@ -11,7 +11,7 @@ import { Input } from '@/components/ui/input';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Activity, Fingerprint, ArrowRight, CheckCircle } from 'lucide-react';
+import { Activity, Fingerprint, ArrowRight, CheckCircle, Plus, X } from 'lucide-react';
 
 // Define the form schema with Zod
 const formSchema = z.object({
@@ -41,6 +41,9 @@ const RegisterForm = () => {
   const [isFingerScanActive, setIsFingerScanActive] = useState(false);
   const [scannedFingers, setScannedFingers] = useState<string[]>([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [allergies, setAllergies] = useState<{name: string, severity: string}[]>([]);
+  const [newAllergyName, setNewAllergyName] = useState('');
+  const [newAllergySeverity, setNewAllergySeverity] = useState('mild');
 
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
@@ -62,6 +65,20 @@ const RegisterForm = () => {
     },
   });
 
+  const addAllergy = () => {
+    if (newAllergyName.trim()) {
+      setAllergies([...allergies, {name: newAllergyName.trim(), severity: newAllergySeverity}]);
+      setNewAllergyName('');
+      setNewAllergySeverity('mild');
+    }
+  };
+
+  const removeAllergy = (index: number) => {
+    const updatedAllergies = [...allergies];
+    updatedAllergies.splice(index, 1);
+    setAllergies(updatedAllergies);
+  };
+
   const handleSubmit = async (values: z.infer<typeof formSchema>) => {
     if (currentStep === 'biodata') {
       setCurrentStep('biometric');
@@ -75,10 +92,23 @@ const RegisterForm = () => {
 
     setIsSubmitting(true);
     
+    // Store user information in localStorage to simulate a database
+    const userData = {
+      ...values,
+      allergies,
+      fingerprints: scannedFingers,
+      registrationDate: new Date().toISOString()
+    };
+    
     // Simulate registration process
     setTimeout(() => {
-      console.log('Registration values:', values);
-      console.log('Fingerprints:', scannedFingers);
+      // Store user data and fingerprints in localStorage for demo purposes
+      localStorage.setItem('userData', JSON.stringify(userData));
+      localStorage.setItem('userFingerprints', JSON.stringify(scannedFingers));
+      localStorage.setItem('userEmail', values.email);
+      localStorage.setItem('userAadhaar', values.aadhaar);
+      localStorage.setItem('isAuthenticated', 'true');
+      localStorage.setItem('userType', 'individual');
       
       toast.success('Registration successful!');
       navigate('/dashboard');
@@ -334,6 +364,66 @@ const RegisterForm = () => {
                     </FormItem>
                   )}
                 />
+                
+                {/* Allergies Section */}
+                <div className="bg-yellow-50 p-4 rounded-md mt-4">
+                  <h3 className="text-md font-semibold mb-3">Allergies</h3>
+                  <div className="space-y-2">
+                    <div className="flex flex-wrap gap-2 mb-2">
+                      {allergies.map((allergy, index) => (
+                        <div 
+                          key={index} 
+                          className={`flex items-center px-3 py-1 rounded-full text-sm 
+                            ${allergy.severity === 'severe' ? 'bg-red-100 text-red-800' : 
+                              allergy.severity === 'moderate' ? 'bg-orange-100 text-orange-800' : 
+                                'bg-yellow-100 text-yellow-800'}`}
+                        >
+                          <span>{allergy.name}</span>
+                          <span className="text-xs ml-1">({allergy.severity})</span>
+                          <Button 
+                            type="button" 
+                            variant="ghost" 
+                            size="sm" 
+                            className="h-5 w-5 p-0 ml-1 text-gray-500 hover:text-red-500"
+                            onClick={() => removeAllergy(index)}
+                          >
+                            <X size={14} />
+                          </Button>
+                        </div>
+                      ))}
+                    </div>
+                    
+                    <div className="flex gap-2">
+                      <Input 
+                        placeholder="Allergy name" 
+                        value={newAllergyName}
+                        onChange={(e) => setNewAllergyName(e.target.value)}
+                        className="flex-grow"
+                      />
+                      <Select 
+                        value={newAllergySeverity}
+                        onValueChange={setNewAllergySeverity}
+                      >
+                        <SelectTrigger className="w-32">
+                          <SelectValue placeholder="Severity" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="mild">Mild</SelectItem>
+                          <SelectItem value="moderate">Moderate</SelectItem>
+                          <SelectItem value="severe">Severe</SelectItem>
+                        </SelectContent>
+                      </Select>
+                      <Button 
+                        type="button" 
+                        size="sm" 
+                        onClick={addAllergy}
+                        disabled={!newAllergyName.trim()}
+                      >
+                        <Plus size={16} />
+                      </Button>
+                    </div>
+                  </div>
+                </div>
                 
                 <div className="bg-blue-50 p-4 rounded-md mt-6">
                   <h3 className="text-md font-semibold mb-3">Emergency Contact</h3>
