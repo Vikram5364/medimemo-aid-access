@@ -1,6 +1,6 @@
 
 import React, { useState } from 'react';
-import { Filter, FolderPlus, Grid3X3, List, Plus, Upload } from 'lucide-react';
+import { Filter, FileText, FolderPlus, Grid3X3, List, Plus, Upload } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
