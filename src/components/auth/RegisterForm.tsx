@@ -1,489 +1,492 @@
 
 import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { Fingerprint, Lock, Mail, User, Calendar, Droplet, HeartPulse, Phone, MapPin } from 'lucide-react';
+import { z } from 'zod';
+import { zodResolver } from '@hookform/resolvers/zod';
+import { useForm } from 'react-hook-form';
+import { toast } from 'sonner';
+import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
-import { Checkbox } from '@/components/ui/checkbox';
+import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
-import { toast } from 'sonner';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Activity, Fingerprint, ArrowRight, CheckCircle } from 'lucide-react';
 
-const RegisterForm: React.FC = () => {
+// Define the form schema with Zod
+const formSchema = z.object({
+  name: z.string().min(3, { message: 'Name must be at least 3 characters' }),
+  email: z.string().email({ message: 'Please enter a valid email address' }),
+  password: z.string().min(8, { message: 'Password must be at least 8 characters' }),
+  aadhaar: z
+    .string()
+    .min(12, { message: 'Aadhaar number must be 12 digits' })
+    .max(12, { message: 'Aadhaar number must be 12 digits' })
+    .regex(/^\d+$/, { message: 'Aadhaar number must contain only digits' }),
+  dob: z.string().min(1, { message: 'Date of birth is required' }),
+  gender: z.string().min(1, { message: 'Gender is required' }),
+  bloodGroup: z.string().min(1, { message: 'Blood group is required' }),
+  contact: z.string().min(10, { message: 'Contact number must be at least 10 digits' }),
+  height: z.string().optional(),
+  weight: z.string().optional(),
+  address: z.string().min(1, { message: 'Address is required' }),
+  emergencyContactName: z.string().min(1, { message: 'Emergency contact name is required' }),
+  emergencyContactRelation: z.string().min(1, { message: 'Relationship is required' }),
+  emergencyContactNumber: z.string().min(10, { message: 'Contact number must be at least 10 digits' }),
+});
+
+const RegisterForm = () => {
   const navigate = useNavigate();
-  const [formData, setFormData] = useState({
-    name: '',
-    email: '',
-    password: '',
-    confirmPassword: '',
-    aadhaar: '',
-    dob: '',
-    gender: 'male',
-    bloodGroup: '',
-    height: '',
-    weight: '',
-    contact: '',
-    address: '',
-    agreeTerms: false
-  });
-  const [step, setStep] = useState(1);
-  const [isVerifying, setIsVerifying] = useState(false);
-  const [isLoading, setIsLoading] = useState(false);
-  const [capturedFingerprints, setCapturedFingerprints] = useState<Record<string, boolean>>({
-    rightThumb: false,
-    rightIndex: false,
-    rightMiddle: false,
-    rightRing: false,
-    rightLittle: false,
-    leftThumb: false,
-    leftIndex: false,
-    leftMiddle: false,
-    leftRing: false,
-    leftLittle: false
+  const [currentStep, setCurrentStep] = useState<'biodata' | 'biometric'>('biodata');
+  const [isFingerScanActive, setIsFingerScanActive] = useState(false);
+  const [scannedFingers, setScannedFingers] = useState<string[]>([]);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  const form = useForm<z.infer<typeof formSchema>>({
+    resolver: zodResolver(formSchema),
+    defaultValues: {
+      name: '',
+      email: '',
+      password: '',
+      aadhaar: '',
+      dob: '',
+      gender: '',
+      bloodGroup: '',
+      contact: '',
+      height: '',
+      weight: '',
+      address: '',
+      emergencyContactName: '',
+      emergencyContactRelation: '',
+      emergencyContactNumber: '',
+    },
   });
 
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const { name, value, type, checked } = e.target;
-    
-    if (name === 'aadhaar') {
-      const numericValue = value.replace(/\D/g, '');
-      let formattedValue = '';
-      
-      for (let i = 0; i < numericValue.length && i < 12; i++) {
-        if (i > 0 && i % 4 === 0) {
-          formattedValue += ' ';
-        }
-        formattedValue += numericValue[i];
-      }
-      
-      setFormData({ ...formData, [name]: formattedValue });
+  const handleSubmit = async (values: z.infer<typeof formSchema>) => {
+    if (currentStep === 'biodata') {
+      setCurrentStep('biometric');
       return;
     }
-    
-    setFormData({
-      ...formData,
-      [name]: type === 'checkbox' ? checked : value
-    });
-  };
 
-  const handleSelectChange = (name: string, value: string) => {
-    setFormData({ ...formData, [name]: value });
-  };
+    if (scannedFingers.length < 10) {
+      toast.error('Please complete the biometric enrollment for all fingers');
+      return;
+    }
 
-  const handleVerifyAadhaar = () => {
-    if (formData.aadhaar.replace(/\s/g, '').length !== 12) {
-      toast.error('Please enter a valid 12-digit Aadhaar number');
-      return;
-    }
-    
-    setIsVerifying(true);
-    
-    // Simulate verification process
-    setTimeout(() => {
-      setIsVerifying(false);
-      toast.success('Aadhaar verification successful');
-      setStep(2);
-    }, 2000);
-  };
-
-  const handleCaptureFingerprint = (finger: string) => {
-    // Simulate fingerprint capture
-    toast.info(`Capturing ${finger.replace(/([A-Z])/g, ' $1').toLowerCase()} fingerprint...`);
-    
-    setTimeout(() => {
-      setCapturedFingerprints(prev => ({
-        ...prev,
-        [finger]: true
-      }));
-      toast.success(`${finger.replace(/([A-Z])/g, ' $1').toLowerCase()} fingerprint captured successfully`);
-      
-      // Check if all fingerprints are captured
-      const allCaptured = Object.values(capturedFingerprints).every(value => value === true);
-      if (allCaptured) {
-        toast.success('All fingerprints captured successfully!');
-      }
-    }, 1500);
-  };
-
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    
-    if (formData.password !== formData.confirmPassword) {
-      toast.error('Passwords do not match');
-      return;
-    }
-    
-    if (!formData.agreeTerms) {
-      toast.error('Please agree to the terms and conditions');
-      return;
-    }
-    
-    // Check if all required fields are filled
-    const requiredFields = ['name', 'email', 'password', 'confirmPassword', 'dob', 'gender', 'bloodGroup', 'contact'];
-    const missingFields = requiredFields.filter(field => !formData[field as keyof typeof formData]);
-    
-    if (missingFields.length > 0) {
-      toast.error(`Please fill in all required fields: ${missingFields.join(', ')}`);
-      return;
-    }
-    
-    // Check if all fingerprints are captured
-    const missingFingerprints = Object.entries(capturedFingerprints)
-      .filter(([_, captured]) => !captured)
-      .map(([finger, _]) => finger.replace(/([A-Z])/g, ' $1').toLowerCase());
-    
-    if (missingFingerprints.length > 0) {
-      toast.error(`Please capture all fingerprints: ${missingFingerprints.join(', ')}`);
-      return;
-    }
-    
-    setIsLoading(true);
+    setIsSubmitting(true);
     
     // Simulate registration process
     setTimeout(() => {
-      setIsLoading(false);
-      toast.success('Registration successful! Please log in to access your account.');
-      navigate('/login');
+      console.log('Registration values:', values);
+      console.log('Fingerprints:', scannedFingers);
+      
+      toast.success('Registration successful!');
+      navigate('/dashboard');
+      setIsSubmitting(false);
     }, 2000);
   };
 
-  const allFingerprintsCaptured = Object.values(capturedFingerprints).every(value => value === true);
+  const fingerPositions = [
+    'Right Thumb',
+    'Right Index',
+    'Right Middle',
+    'Right Ring',
+    'Right Little',
+    'Left Thumb',
+    'Left Index',
+    'Left Middle',
+    'Left Ring',
+    'Left Little'
+  ];
 
-  const bloodGroups = ['A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-'];
+  const simulateFingerprintScan = (fingerPosition: string) => {
+    if (scannedFingers.includes(fingerPosition)) {
+      return;
+    }
+
+    setIsFingerScanActive(true);
+    
+    // Simulate fingerprint scanning
+    setTimeout(() => {
+      setScannedFingers(prev => [...prev, fingerPosition]);
+      setIsFingerScanActive(false);
+      toast.success(`${fingerPosition} scanned successfully`);
+    }, 1500);
+  };
 
   return (
-    <Card className="w-full max-w-md shadow-lg">
-      <CardHeader>
-        <CardTitle className="text-2xl text-center">Create an Account</CardTitle>
-        <CardDescription className="text-center">
-          Register to manage your medical records securely
+    <Card className="w-full shadow-lg">
+      <CardHeader className="space-y-1">
+        <div className="flex items-center gap-2">
+          <Activity className="h-6 w-6 text-medimemo-primary" />
+          <CardTitle className="text-2xl font-bold">Create your MediMemo account</CardTitle>
+        </div>
+        <CardDescription>
+          Register with Aadhaar to securely store and access your medical records
         </CardDescription>
       </CardHeader>
       <CardContent>
-        {step === 1 ? (
-          <div className="space-y-4">
-            <div className="space-y-2">
-              <Label htmlFor="aadhaar">Aadhaar Number</Label>
-              <div className="relative">
-                <Fingerprint className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" size={18} />
-                <Input
-                  id="aadhaar"
-                  name="aadhaar"
-                  type="text"
-                  placeholder="XXXX XXXX XXXX"
-                  className="pl-10"
-                  value={formData.aadhaar}
-                  onChange={handleChange}
-                  maxLength={14}
-                  required
-                />
-              </div>
-              <p className="text-xs text-gray-500 mt-1">
-                Your Aadhaar number is required for identity verification
-              </p>
-            </div>
-            
-            <Button 
-              type="button" 
-              className="w-full"
-              onClick={handleVerifyAadhaar}
-              disabled={isVerifying || formData.aadhaar.replace(/\s/g, '').length !== 12}
-            >
-              {isVerifying ? "Verifying..." : "Verify Aadhaar"}
-            </Button>
-          </div>
-        ) : (
-          <form onSubmit={handleSubmit} className="space-y-4">
-            <div className="space-y-2">
-              <Label htmlFor="name">Full Name</Label>
-              <div className="relative">
-                <User className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" size={18} />
-                <Input
-                  id="name"
-                  name="name"
-                  type="text"
-                  placeholder="John Doe"
-                  className="pl-10"
-                  value={formData.name}
-                  onChange={handleChange}
-                  required
-                />
-              </div>
-            </div>
-            
-            <div className="space-y-2">
-              <Label htmlFor="email">Email</Label>
-              <div className="relative">
-                <Mail className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" size={18} />
-                <Input
-                  id="email"
-                  name="email"
-                  type="email"
-                  placeholder="john.doe@example.com"
-                  className="pl-10"
-                  value={formData.email}
-                  onChange={handleChange}
-                  required
-                />
-              </div>
-            </div>
-            
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label htmlFor="dob">Date of Birth</Label>
-                <div className="relative">
-                  <Calendar className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" size={18} />
-                  <Input
-                    id="dob"
-                    name="dob"
-                    type="date"
-                    className="pl-10"
-                    value={formData.dob}
-                    onChange={handleChange}
-                    required
+        <Tabs value={currentStep} className="w-full">
+          <TabsList className="grid w-full grid-cols-2">
+            <TabsTrigger value="biodata" disabled={currentStep === 'biometric'}>Personal Information</TabsTrigger>
+            <TabsTrigger value="biometric" disabled={currentStep === 'biodata'}>Biometric Enrollment</TabsTrigger>
+          </TabsList>
+          
+          <TabsContent value="biodata">
+            <Form {...form}>
+              <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <FormField
+                    control={form.control}
+                    name="name"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Full Name</FormLabel>
+                        <FormControl>
+                          <Input placeholder="Enter your full name" {...field} />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
                   />
-                </div>
-              </div>
-              
-              <div className="space-y-2">
-                <Label>Gender</Label>
-                <RadioGroup 
-                  value={formData.gender} 
-                  onValueChange={(value) => handleSelectChange('gender', value)}
-                  className="flex space-x-4"
-                >
-                  <div className="flex items-center space-x-2">
-                    <RadioGroupItem value="male" id="male" />
-                    <Label htmlFor="male">Male</Label>
-                  </div>
-                  <div className="flex items-center space-x-2">
-                    <RadioGroupItem value="female" id="female" />
-                    <Label htmlFor="female">Female</Label>
-                  </div>
-                  <div className="flex items-center space-x-2">
-                    <RadioGroupItem value="other" id="other" />
-                    <Label htmlFor="other">Other</Label>
-                  </div>
-                </RadioGroup>
-              </div>
-            </div>
-            
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label htmlFor="bloodGroup">Blood Group</Label>
-                <div className="relative">
-                  <Droplet className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" size={18} />
-                  <Select 
-                    value={formData.bloodGroup} 
-                    onValueChange={(value) => handleSelectChange('bloodGroup', value)}
-                  >
-                    <SelectTrigger className="pl-10">
-                      <SelectValue placeholder="Select" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {bloodGroups.map((group) => (
-                        <SelectItem key={group} value={group}>{group}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-              </div>
-              
-              <div className="space-y-2">
-                <Label htmlFor="contact">Contact Number</Label>
-                <div className="relative">
-                  <Phone className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" size={18} />
-                  <Input
-                    id="contact"
-                    name="contact"
-                    type="tel"
-                    placeholder="9876543210"
-                    className="pl-10"
-                    value={formData.contact}
-                    onChange={handleChange}
-                    required
+                  
+                  <FormField
+                    control={form.control}
+                    name="email"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Email</FormLabel>
+                        <FormControl>
+                          <Input type="email" placeholder="Enter your email" {...field} />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
                   />
-                </div>
-              </div>
-            </div>
-            
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label htmlFor="height">Height (cm)</Label>
-                <div className="relative">
-                  <HeartPulse className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" size={18} />
-                  <Input
-                    id="height"
-                    name="height"
-                    type="number"
-                    placeholder="175"
-                    className="pl-10"
-                    value={formData.height}
-                    onChange={handleChange}
-                  />
-                </div>
-              </div>
-              
-              <div className="space-y-2">
-                <Label htmlFor="weight">Weight (kg)</Label>
-                <div className="relative">
-                  <HeartPulse className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" size={18} />
-                  <Input
-                    id="weight"
-                    name="weight"
-                    type="number"
-                    placeholder="70"
-                    className="pl-10"
-                    value={formData.weight}
-                    onChange={handleChange}
-                  />
-                </div>
-              </div>
-            </div>
-            
-            <div className="space-y-2">
-              <Label htmlFor="address">Address</Label>
-              <div className="relative">
-                <MapPin className="absolute left-3 top-3 text-gray-400" size={18} />
-                <Input
-                  id="address"
-                  name="address"
-                  type="text"
-                  placeholder="Your complete address"
-                  className="pl-10 min-h-[80px]"
-                  value={formData.address}
-                  onChange={handleChange}
-                />
-              </div>
-            </div>
-            
-            <div className="space-y-2">
-              <Label htmlFor="password">Password</Label>
-              <div className="relative">
-                <Lock className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" size={18} />
-                <Input
-                  id="password"
-                  name="password"
-                  type="password"
-                  placeholder="••••••••"
-                  className="pl-10"
-                  value={formData.password}
-                  onChange={handleChange}
-                  required
-                  minLength={8}
-                />
-              </div>
-              <p className="text-xs text-gray-500">
-                Password must be at least 8 characters
-              </p>
-            </div>
-            
-            <div className="space-y-2">
-              <Label htmlFor="confirmPassword">Confirm Password</Label>
-              <div className="relative">
-                <Lock className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" size={18} />
-                <Input
-                  id="confirmPassword"
-                  name="confirmPassword"
-                  type="password"
-                  placeholder="••••••••"
-                  className="pl-10"
-                  value={formData.confirmPassword}
-                  onChange={handleChange}
-                  required
-                />
-              </div>
-            </div>
-            
-            <div className="p-4 border rounded-md space-y-3">
-              <h3 className="font-semibold flex items-center">
-                <Fingerprint className="mr-2" size={18} />
-                Biometric Enrollment
-              </h3>
-              <p className="text-sm text-gray-500">Please capture all 10 fingerprints for biometric registration</p>
-              
-              <div className="space-y-3">
-                <div className="grid grid-cols-2 gap-3">
-                  <h4 className="font-medium col-span-2">Right Hand</h4>
-                  {['rightThumb', 'rightIndex', 'rightMiddle', 'rightRing', 'rightLittle'].map((finger) => (
-                    <Button
-                      key={finger}
-                      type="button"
-                      variant={capturedFingerprints[finger] ? "default" : "outline"}
-                      className="flex items-center gap-2"
-                      onClick={() => handleCaptureFingerprint(finger)}
-                      disabled={capturedFingerprints[finger]}
-                    >
-                      <Fingerprint size={16} />
-                      {finger.replace('right', '').replace(/([A-Z])/g, ' $1').trim()}
-                      {capturedFingerprints[finger] && " ✓"}
-                    </Button>
-                  ))}
                 </div>
                 
-                <div className="grid grid-cols-2 gap-3">
-                  <h4 className="font-medium col-span-2">Left Hand</h4>
-                  {['leftThumb', 'leftIndex', 'leftMiddle', 'leftRing', 'leftLittle'].map((finger) => (
-                    <Button
-                      key={finger}
-                      type="button"
-                      variant={capturedFingerprints[finger] ? "default" : "outline"}
-                      className="flex items-center gap-2"
-                      onClick={() => handleCaptureFingerprint(finger)}
-                      disabled={capturedFingerprints[finger]}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <FormField
+                    control={form.control}
+                    name="password"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Password</FormLabel>
+                        <FormControl>
+                          <Input type="password" placeholder="Create a password" {...field} />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  
+                  <FormField
+                    control={form.control}
+                    name="aadhaar"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Aadhaar Number</FormLabel>
+                        <FormControl>
+                          <Input 
+                            placeholder="12-digit Aadhaar Number" 
+                            {...field}
+                            onChange={(e) => {
+                              const value = e.target.value.replace(/\D/g, '');
+                              if (value.length <= 12) {
+                                field.onChange(value);
+                              }
+                            }}
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </div>
+                
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <FormField
+                    control={form.control}
+                    name="dob"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Date of Birth</FormLabel>
+                        <FormControl>
+                          <Input type="date" {...field} />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  
+                  <FormField
+                    control={form.control}
+                    name="gender"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Gender</FormLabel>
+                        <Select 
+                          onValueChange={field.onChange} 
+                          defaultValue={field.value}
+                        >
+                          <FormControl>
+                            <SelectTrigger>
+                              <SelectValue placeholder="Select gender" />
+                            </SelectTrigger>
+                          </FormControl>
+                          <SelectContent>
+                            <SelectItem value="male">Male</SelectItem>
+                            <SelectItem value="female">Female</SelectItem>
+                            <SelectItem value="other">Other</SelectItem>
+                          </SelectContent>
+                        </Select>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  
+                  <FormField
+                    control={form.control}
+                    name="bloodGroup"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Blood Group</FormLabel>
+                        <Select 
+                          onValueChange={field.onChange} 
+                          defaultValue={field.value}
+                        >
+                          <FormControl>
+                            <SelectTrigger>
+                              <SelectValue placeholder="Select blood group" />
+                            </SelectTrigger>
+                          </FormControl>
+                          <SelectContent>
+                            <SelectItem value="A+">A+</SelectItem>
+                            <SelectItem value="A-">A-</SelectItem>
+                            <SelectItem value="B+">B+</SelectItem>
+                            <SelectItem value="B-">B-</SelectItem>
+                            <SelectItem value="AB+">AB+</SelectItem>
+                            <SelectItem value="AB-">AB-</SelectItem>
+                            <SelectItem value="O+">O+</SelectItem>
+                            <SelectItem value="O-">O-</SelectItem>
+                          </SelectContent>
+                        </Select>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </div>
+                
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <FormField
+                    control={form.control}
+                    name="contact"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Contact Number</FormLabel>
+                        <FormControl>
+                          <Input placeholder="Your phone number" {...field} />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  
+                  <FormField
+                    control={form.control}
+                    name="height"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Height (cm)</FormLabel>
+                        <FormControl>
+                          <Input type="number" placeholder="Height in cm" {...field} />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  
+                  <FormField
+                    control={form.control}
+                    name="weight"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Weight (kg)</FormLabel>
+                        <FormControl>
+                          <Input type="number" placeholder="Weight in kg" {...field} />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </div>
+                
+                <FormField
+                  control={form.control}
+                  name="address"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Address</FormLabel>
+                      <FormControl>
+                        <Input placeholder="Your current address" {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                
+                <div className="bg-blue-50 p-4 rounded-md mt-6">
+                  <h3 className="text-md font-semibold mb-3">Emergency Contact</h3>
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <FormField
+                      control={form.control}
+                      name="emergencyContactName"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Name</FormLabel>
+                          <FormControl>
+                            <Input placeholder="Contact name" {...field} />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    
+                    <FormField
+                      control={form.control}
+                      name="emergencyContactRelation"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Relationship</FormLabel>
+                          <Select 
+                            onValueChange={field.onChange} 
+                            defaultValue={field.value}
+                          >
+                            <FormControl>
+                              <SelectTrigger>
+                                <SelectValue placeholder="Relationship" />
+                              </SelectTrigger>
+                            </FormControl>
+                            <SelectContent>
+                              <SelectItem value="spouse">Spouse</SelectItem>
+                              <SelectItem value="parent">Parent</SelectItem>
+                              <SelectItem value="child">Child</SelectItem>
+                              <SelectItem value="sibling">Sibling</SelectItem>
+                              <SelectItem value="relative">Other Relative</SelectItem>
+                              <SelectItem value="friend">Friend</SelectItem>
+                            </SelectContent>
+                          </Select>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    
+                    <FormField
+                      control={form.control}
+                      name="emergencyContactNumber"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Contact Number</FormLabel>
+                          <FormControl>
+                            <Input placeholder="Contact phone number" {...field} />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  </div>
+                </div>
+                
+                <Button 
+                  type="submit" 
+                  className="w-full"
+                >
+                  Continue to Biometric Enrollment
+                  <ArrowRight className="ml-2 h-4 w-4" />
+                </Button>
+              </form>
+            </Form>
+          </TabsContent>
+          
+          <TabsContent value="biometric">
+            <div className="space-y-6">
+              <div className="bg-blue-50 p-4 rounded-md">
+                <h3 className="text-md font-semibold flex items-center mb-2">
+                  <Fingerprint className="h-5 w-5 mr-2 text-medimemo-primary" />
+                  Fingerprint Enrollment
+                </h3>
+                <p className="text-sm text-gray-600 mb-4">
+                  Please scan all 10 fingerprints for complete biometric enrollment. 
+                  This will allow emergency healthcare access through fingerprint identification.
+                </p>
+                
+                <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
+                  {fingerPositions.map((finger) => (
+                    <div 
+                      key={finger} 
+                      className={`border rounded-md p-3 cursor-pointer transition-all
+                        ${scannedFingers.includes(finger) 
+                          ? 'bg-green-50 border-green-200' 
+                          : 'bg-white border-gray-200 hover:border-blue-300'}
+                        ${isFingerScanActive ? 'pointer-events-none opacity-50' : ''}
+                      `}
+                      onClick={() => simulateFingerprintScan(finger)}
                     >
-                      <Fingerprint size={16} />
-                      {finger.replace('left', '').replace(/([A-Z])/g, ' $1').trim()}
-                      {capturedFingerprints[finger] && " ✓"}
-                    </Button>
+                      <div className="flex flex-col items-center">
+                        {scannedFingers.includes(finger) ? (
+                          <CheckCircle className="h-10 w-10 text-green-500 mb-2" />
+                        ) : (
+                          <Fingerprint className={`h-10 w-10 ${isFingerScanActive ? 'animate-pulse text-blue-500' : 'text-gray-400'} mb-2`} />
+                        )}
+                        <p className="text-xs text-center font-medium">{finger}</p>
+                        {scannedFingers.includes(finger) && (
+                          <span className="text-xs text-green-600 mt-1">Scanned</span>
+                        )}
+                      </div>
+                    </div>
                   ))}
                 </div>
               </div>
+              
+              <div className="flex justify-between">
+                <Button 
+                  type="button" 
+                  variant="outline"
+                  onClick={() => setCurrentStep('biodata')}
+                  disabled={isFingerScanActive || isSubmitting}
+                >
+                  Back to Personal Information
+                </Button>
+                
+                <Button 
+                  type="button"
+                  onClick={form.handleSubmit(handleSubmit)}
+                  disabled={scannedFingers.length < 10 || isFingerScanActive || isSubmitting}
+                  className={scannedFingers.length < 10 ? 'opacity-50' : ''}
+                >
+                  {isSubmitting ? 'Registering...' : 'Complete Registration'}
+                </Button>
+              </div>
+              
+              {scannedFingers.length < 10 && (
+                <p className="text-sm text-amber-600 text-center mt-2">
+                  Please scan all 10 fingerprints to complete registration ({scannedFingers.length}/10 completed)
+                </p>
+              )}
             </div>
-            
-            <div className="flex items-center space-x-2">
-              <Checkbox 
-                id="agreeTerms" 
-                name="agreeTerms"
-                checked={formData.agreeTerms}
-                onCheckedChange={(checked) => 
-                  setFormData({ ...formData, agreeTerms: checked as boolean })
-                }
-              />
-              <label
-                htmlFor="agreeTerms"
-                className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
-              >
-                I agree to the{" "}
-                <Link to="/terms" className="text-medimemo-primary hover:underline">
-                  Terms of Service
-                </Link>
-                {" "}and{" "}
-                <Link to="/privacy" className="text-medimemo-primary hover:underline">
-                  Privacy Policy
-                </Link>
-              </label>
-            </div>
-            
-            <Button 
-              type="submit" 
-              className="w-full" 
-              disabled={isLoading || !allFingerprintsCaptured}
-            >
-              {isLoading ? "Creating account..." : "Create Account"}
-            </Button>
-          </form>
-        )}
+          </TabsContent>
+        </Tabs>
       </CardContent>
-      <CardFooter>
-        <p className="text-center text-sm text-gray-600 w-full">
-          Already have an account?{" "}
-          <Link to="/login" className="text-medimemo-primary hover:underline font-medium">
-            Log in
+      <CardFooter className="flex flex-col space-y-4">
+        <div className="text-sm text-gray-500 text-center w-full">
+          By registering, you agree to MediMemo's Terms of Service and Privacy Policy
+        </div>
+        <div className="text-sm text-center w-full">
+          Already have an account?{' '}
+          <Link to="/login" className="text-medimemo-primary hover:underline">
+            Login here
           </Link>
-        </p>
+        </div>
       </CardFooter>
     </Card>
   );
