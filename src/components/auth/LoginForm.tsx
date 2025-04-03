@@ -7,10 +7,13 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { useAuth } from '@/hooks/use-auth';
 import { toast } from 'sonner';
+import { verifyFingerprint, scanFingerprint } from '@/utils/fingerprint-utils';
 
 const LoginForm: React.FC = () => {
   const navigate = useNavigate();
+  const { login, isLoading } = useAuth();
   const [userType, setUserType] = useState('individual');
   const [loginMethod, setLoginMethod] = useState('email');
   const [email, setEmail] = useState('');
@@ -18,81 +21,75 @@ const LoginForm: React.FC = () => {
   const [aadhaar, setAadhaar] = useState('');
   const [orgId, setOrgId] = useState('');
   const [orgPassword, setOrgPassword] = useState('');
-  const [isLoading, setIsLoading] = useState(false);
+  const [isBiometricLoading, setIsBiometricLoading] = useState(false);
 
-  const handleIndividualLogin = (e: React.FormEvent) => {
+  const handleIndividualLogin = async (e: React.FormEvent) => {
     e.preventDefault();
-    setIsLoading(true);
     
-    // Simulate login process for individuals
-    setTimeout(() => {
-      setIsLoading(false);
+    if (loginMethod === 'email') {
+      const success = await login('email', { 
+        email, 
+        password 
+      });
       
-      if (loginMethod === 'email' && email && password) {
-        // Store user information in localStorage to simulate a real login
-        localStorage.setItem('userType', 'individual');
-        localStorage.setItem('userEmail', email);
-        localStorage.setItem('isAuthenticated', 'true');
-        
-        toast.success('Login successful');
+      if (success) {
         navigate('/dashboard');
-      } else if (loginMethod === 'aadhaar' && aadhaar) {
-        // Store user information in localStorage to simulate a real login
-        localStorage.setItem('userType', 'individual');
-        localStorage.setItem('userAadhaar', aadhaar);
-        localStorage.setItem('isAuthenticated', 'true');
-        
-        toast.success('Login successful');
-        navigate('/dashboard');
-      } else {
-        toast.error('Invalid credentials. Please try again.');
       }
-    }, 1500);
+    } else if (loginMethod === 'aadhaar') {
+      // Format Aadhaar by removing spaces
+      const formattedAadhaar = aadhaar.replace(/\s/g, '');
+      
+      const success = await login('aadhaar', { 
+        aadhaar: formattedAadhaar 
+      });
+      
+      if (success) {
+        navigate('/dashboard');
+      }
+    }
   };
 
-  const handleOrganizationLogin = (e: React.FormEvent) => {
+  const handleOrganizationLogin = async (e: React.FormEvent) => {
     e.preventDefault();
-    setIsLoading(true);
     
-    // Simulate organization login process
-    setTimeout(() => {
-      setIsLoading(false);
-      
-      if (orgId && orgPassword) {
-        // Store organization information in localStorage
-        localStorage.setItem('userType', 'organization');
-        localStorage.setItem('orgId', orgId);
-        localStorage.setItem('isAuthenticated', 'true');
-        
-        toast.success('Organization login successful');
-        navigate('/dashboard');
-      } else {
-        toast.error('Invalid organization credentials. Please try again.');
-      }
-    }, 1500);
+    const success = await login('organization', {
+      orgId,
+      password: orgPassword
+    });
+    
+    if (success) {
+      navigate('/dashboard');
+    }
   };
 
-  const handleBiometricAuth = () => {
-    setIsLoading(true);
+  const handleBiometricAuth = async () => {
+    setIsBiometricLoading(true);
     
-    // Simulate fingerprint verification that uses stored fingerprint data
-    setTimeout(() => {
-      setIsLoading(false);
+    try {
+      // Simulate fingerprint scanning
+      toast.info('Place your finger on the scanner');
       
-      // Get fingerprint from local storage if it exists (this would be set during registration)
-      const fingerprints = localStorage.getItem('userFingerprints');
+      // Scan any finger (in a real app, this would use the fingerprint scanner)
+      const scannedFingerprint = await scanFingerprint('right_index');
       
-      if (fingerprints) {
-        localStorage.setItem('userType', 'individual');
-        localStorage.setItem('isAuthenticated', 'true');
-        localStorage.setItem('authMethod', 'biometric');
+      // Verify the fingerprint
+      const isVerified = await verifyFingerprint(scannedFingerprint);
+      
+      if (isVerified) {
+        const success = await login('biometric', {});
         
-        toast.success('Biometric authentication successful');
-        navigate('/dashboard');
+        if (success) {
+          navigate('/dashboard');
+        }
       } else {
-        toast.error('Biometric data not found. Please register or use another login method.');
+        toast.error('Fingerprint verification failed');
       }
-    }, 2000);
+    } catch (error) {
+      console.error('Biometric authentication error:', error);
+      toast.error('Failed to authenticate with biometrics');
+    } finally {
+      setIsBiometricLoading(false);
+    }
   };
 
   return (
@@ -218,10 +215,10 @@ const LoginForm: React.FC = () => {
                       onClick={handleBiometricAuth}
                       variant="outline"
                       className="w-full"
-                      disabled={isLoading}
+                      disabled={isLoading || isBiometricLoading}
                     >
                       <Fingerprint className="mr-2" size={18} />
-                      {isLoading ? "Authenticating..." : "Use Biometric Authentication"}
+                      {isBiometricLoading ? "Authenticating..." : "Use Biometric Authentication"}
                     </Button>
                   </div>
                 </div>
