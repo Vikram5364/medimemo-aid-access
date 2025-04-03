@@ -4,9 +4,10 @@ import { Link, useNavigate } from 'react-router-dom';
 import { z } from 'zod';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { Eye, EyeOff, Loader2 } from 'lucide-react';
+import { Eye, EyeOff, Loader2, Plus, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { Textarea } from '@/components/ui/textarea';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -39,6 +40,9 @@ const registerSchema = z.object({
     .optional()
     .or(z.literal('')),
   address: z.string().optional(),
+  height: z.string().optional(),
+  weight: z.string().optional(),
+  allergies: z.array(z.string()).default([]),
   emergencyContactName: z.string().optional(),
   emergencyContactRelation: z.string().optional(),
   emergencyContactNumber: z
@@ -56,6 +60,7 @@ type RegisterFormValues = z.infer<typeof registerSchema>;
 const RegisterForm = () => {
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+  const [newAllergy, setNewAllergy] = useState('');
   const navigate = useNavigate();
   const { register, isLoading } = useAuth();
 
@@ -72,6 +77,9 @@ const RegisterForm = () => {
       bloodGroup: '',
       contact: '',
       address: '',
+      height: '',
+      weight: '',
+      allergies: [],
       emergencyContactName: '',
       emergencyContactRelation: '',
       emergencyContactNumber: ''
@@ -88,9 +96,12 @@ const RegisterForm = () => {
         bloodGroup: data.bloodGroup,
         contact: data.contact,
         address: data.address,
+        height: data.height,
+        weight: data.weight,
+        allergies: data.allergies,
         emergencyContactName: data.emergencyContactName,
         emergencyContactRelation: data.emergencyContactRelation,
-        emergencyContactNumber: data.emergencyContactNumber
+        emergencyContactNumber: data.emergencyContactNumber,
       });
       
       if (success) {
@@ -109,6 +120,21 @@ const RegisterForm = () => {
 
   const toggleConfirmPasswordVisibility = () => {
     setShowConfirmPassword(!showConfirmPassword);
+  };
+
+  const addAllergy = () => {
+    if (newAllergy.trim() === '') return;
+    
+    const currentAllergies = form.getValues('allergies') || [];
+    if (!currentAllergies.includes(newAllergy.trim())) {
+      form.setValue('allergies', [...currentAllergies, newAllergy.trim()]);
+      setNewAllergy('');
+    }
+  };
+
+  const removeAllergy = (allergy: string) => {
+    const currentAllergies = form.getValues('allergies') || [];
+    form.setValue('allergies', currentAllergies.filter(a => a !== allergy));
   };
 
   return (
@@ -265,6 +291,36 @@ const RegisterForm = () => {
                     )}
                   />
                 </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <FormField
+                    control={form.control}
+                    name="height"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Height (cm)</FormLabel>
+                        <FormControl>
+                          <Input type="number" placeholder="175" {...field} />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  
+                  <FormField
+                    control={form.control}
+                    name="weight"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Weight (kg)</FormLabel>
+                        <FormControl>
+                          <Input type="number" placeholder="70" {...field} />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </div>
                 
                 <FormField
                   control={form.control}
@@ -293,6 +349,126 @@ const RegisterForm = () => {
                     </FormItem>
                   )}
                 />
+
+                <FormField
+                  control={form.control}
+                  name="allergies"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Allergies</FormLabel>
+                      <div className="flex space-x-2 mb-2">
+                        <Input 
+                          value={newAllergy}
+                          onChange={(e) => setNewAllergy(e.target.value)}
+                          placeholder="Add allergy"
+                          className="flex-1"
+                        />
+                        <Button 
+                          type="button" 
+                          variant="outline" 
+                          size="icon"
+                          onClick={addAllergy}
+                        >
+                          <Plus className="h-4 w-4" />
+                        </Button>
+                      </div>
+                      <div className="flex flex-wrap gap-2 mt-2">
+                        {field.value?.map((allergy, index) => (
+                          <div key={index} className="flex items-center bg-secondary text-secondary-foreground rounded-full px-3 py-1 text-sm">
+                            {allergy}
+                            <button
+                              type="button"
+                              className="ml-1 text-secondary-foreground/70 hover:text-secondary-foreground"
+                              onClick={() => removeAllergy(allergy)}
+                            >
+                              <X className="h-3 w-3" />
+                            </button>
+                          </div>
+                        ))}
+                      </div>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <FormField
+                  control={form.control}
+                  name="contact"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Contact Number</FormLabel>
+                      <FormControl>
+                        <Input placeholder="9876543210" {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <FormField
+                  control={form.control}
+                  name="address"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Address</FormLabel>
+                      <FormControl>
+                        <Textarea 
+                          placeholder="Enter your full address" 
+                          className="resize-none" 
+                          {...field} 
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                
+                <div className="space-y-4 border border-input rounded-md p-4">
+                  <h3 className="text-sm font-medium">Emergency Contact</h3>
+                  <FormField
+                    control={form.control}
+                    name="emergencyContactName"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Name</FormLabel>
+                        <FormControl>
+                          <Input placeholder="Contact person name" {...field} />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <FormField
+                      control={form.control}
+                      name="emergencyContactRelation"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Relationship</FormLabel>
+                          <FormControl>
+                            <Input placeholder="e.g. Spouse, Parent" {...field} />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    
+                    <FormField
+                      control={form.control}
+                      name="emergencyContactNumber"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Contact Number</FormLabel>
+                          <FormControl>
+                            <Input placeholder="9876543210" {...field} />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  </div>
+                </div>
                 
                 <Button type="submit" className="w-full" disabled={isLoading}>
                   {isLoading ? (
@@ -304,19 +480,147 @@ const RegisterForm = () => {
                     "Create Account"
                   )}
                 </Button>
+                
+                <div className="text-center text-sm text-muted-foreground">
+                  <Link to="/fingerprint-enrollment" className="text-primary hover:text-primary/90">
+                    Click here to enroll your fingerprints after registration
+                  </Link>
+                </div>
               </form>
             </Form>
           </TabsContent>
           
           <TabsContent value="organization">
-            <div className="text-center py-8">
-              <p className="text-sm text-muted-foreground mb-4">
-                Organization registration is currently available through our verification process.
-              </p>
-              <Button variant="outline" disabled>
-                Coming Soon
-              </Button>
-            </div>
+            <Form {...form}>
+              <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+                <FormField
+                  control={form.control}
+                  name="name"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Organization Name</FormLabel>
+                      <FormControl>
+                        <Input placeholder="Health Organization Name" {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                
+                <FormField
+                  control={form.control}
+                  name="email"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Organization Email</FormLabel>
+                      <FormControl>
+                        <Input type="email" placeholder="organization@example.com" {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <FormField
+                    control={form.control}
+                    name="password"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Password</FormLabel>
+                        <FormControl>
+                          <div className="relative">
+                            <Input
+                              type={showPassword ? "text" : "password"}
+                              placeholder="********"
+                              {...field}
+                            />
+                            <button
+                              type="button"
+                              className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-500"
+                              onClick={togglePasswordVisibility}
+                            >
+                              {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                            </button>
+                          </div>
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  
+                  <FormField
+                    control={form.control}
+                    name="confirmPassword"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Confirm Password</FormLabel>
+                        <FormControl>
+                          <div className="relative">
+                            <Input
+                              type={showConfirmPassword ? "text" : "password"}
+                              placeholder="********"
+                              {...field}
+                            />
+                            <button
+                              type="button"
+                              className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-500"
+                              onClick={toggleConfirmPasswordVisibility}
+                            >
+                              {showConfirmPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                            </button>
+                          </div>
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </div>
+                
+                <FormField
+                  control={form.control}
+                  name="contact"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Contact Number</FormLabel>
+                      <FormControl>
+                        <Input placeholder="9876543210" {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                
+                <FormField
+                  control={form.control}
+                  name="address"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Address</FormLabel>
+                      <FormControl>
+                        <Textarea 
+                          placeholder="Enter organization address" 
+                          className="resize-none" 
+                          {...field} 
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                
+                <Button type="submit" className="w-full" disabled={isLoading}>
+                  {isLoading ? (
+                    <>
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      Registering Organization...
+                    </>
+                  ) : (
+                    "Register Organization"
+                  )}
+                </Button>
+              </form>
+            </Form>
           </TabsContent>
         </Tabs>
       </CardContent>

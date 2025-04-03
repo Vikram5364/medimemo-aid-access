@@ -136,6 +136,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
               dob: userData.dob,
               gender: userData.gender,
               blood_group: userData.bloodGroup,
+              height: userData.height ? Number(userData.height) : null,
+              weight: userData.weight ? Number(userData.weight) : null,
               contact: userData.contact,
               address: userData.address,
               emergency_contact_name: userData.emergencyContactName,
@@ -147,6 +149,24 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           if (profileError) {
             console.error('Error updating profile:', profileError);
             toast.error('Registration successful but profile update failed');
+          }
+          
+          // If the user provided allergies, store them
+          if (userData.allergies && userData.allergies.length > 0) {
+            // Create a batch of allergie entries
+            const allergiesPromises = userData.allergies.map((name: string) => {
+              return supabase.from('allergies').insert({
+                user_id: data.user?.id,
+                name: name,
+                severity: 'medium' // Default severity
+              });
+            });
+            
+            try {
+              await Promise.all(allergiesPromises);
+            } catch (allergyError) {
+              console.error('Error saving allergies:', allergyError);
+            }
           }
         } 
         // For organization users, create an organization record
