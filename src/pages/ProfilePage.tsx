@@ -872,3 +872,4 @@ const ProfilePage: React.FC = () => {
                         >
                           Add Your First Allergy
                         </Button>
+                      </div>
