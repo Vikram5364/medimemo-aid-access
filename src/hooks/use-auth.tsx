@@ -36,17 +36,23 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         if (session) {
           setIsAuthenticated(true);
           setUserEmail(session.user.email);
-          setUserType('individual'); // Default to individual for now
           
-          // Retrieve Aadhaar if available
-          const { data: profileData } = await supabase
-            .from('profiles')
-            .select('aadhaar')
-            .eq('id', session.user.id)
-            .single();
+          // Check if user is an organization by looking at metadata
+          if (session.user.user_metadata?.isOrganization) {
+            setUserType('organization');
+          } else {
+            setUserType('individual');
             
-          if (profileData && profileData.aadhaar) {
-            setUserAadhaar(profileData.aadhaar);
+            // Retrieve Aadhaar if available for individuals
+            const { data: profileData } = await supabase
+              .from('profiles')
+              .select('aadhaar')
+              .eq('id', session.user.id)
+              .single();
+              
+            if (profileData && profileData.aadhaar) {
+              setUserAadhaar(profileData.aadhaar);
+            }
           }
         }
       } catch (error) {
@@ -65,17 +71,23 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         setUserEmail(session?.user?.email || null);
         
         if (session) {
-          setUserType('individual'); // Default to individual for now
-          
-          // Try to get Aadhaar from profile
-          const { data: profileData } = await supabase
-            .from('profiles')
-            .select('aadhaar')
-            .eq('id', session.user.id)
-            .single();
+          // Check if user is an organization by looking at metadata
+          if (session.user.user_metadata?.isOrganization) {
+            setUserType('organization');
+            setUserAadhaar(null); // Organizations don't have Aadhaar
+          } else {
+            setUserType('individual');
             
-          if (profileData && profileData.aadhaar) {
-            setUserAadhaar(profileData.aadhaar);
+            // Try to get Aadhaar from profile for individuals
+            const { data: profileData } = await supabase
+              .from('profiles')
+              .select('aadhaar')
+              .eq('id', session.user.id)
+              .single();
+              
+            if (profileData && profileData.aadhaar) {
+              setUserAadhaar(profileData.aadhaar);
+            }
           }
         } else {
           setUserType(null);
@@ -93,13 +105,17 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     setIsLoading(true);
     
     try {
+      // Determine if this is an organization registration
+      const isOrganization = userData?.isOrganization || false;
+      
       const { data, error } = await supabase.auth.signUp({
         email,
         password,
         options: {
           data: {
             name: userData?.name,
-            aadhaar: userData?.aadhaar
+            aadhaar: userData?.aadhaar,
+            isOrganization: isOrganization
           }
         }
       });
@@ -110,8 +126,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       }
       
       if (data.user) {
-        // Update profile with additional user data
-        if (userData) {
+        // For individual users, update profile with additional user data
+        if (!isOrganization && userData) {
           const { error: profileError } = await supabase
             .from('profiles')
             .update({
@@ -132,6 +148,12 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
             console.error('Error updating profile:', profileError);
             toast.error('Registration successful but profile update failed');
           }
+        } 
+        // For organization users, create an organization record
+        else if (isOrganization && userData) {
+          // You might want to create an 'organizations' table in Supabase for this
+          // This is a simplified version that uses user_metadata for now
+          toast.success('Organization registration successful!');
         }
         
         toast.success('Registration successful! Please check your email to verify your account.');
@@ -169,19 +191,25 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           }
           
           if (data.user) {
-            setIsAuthenticated(true);
-            setUserType('individual');
-            setUserEmail(data.user.email);
-            toast.success('Login successful');
-            return true;
+            // Check if this is an individual user (not an organization)
+            if (!data.user.user_metadata?.isOrganization) {
+              setIsAuthenticated(true);
+              setUserType('individual');
+              setUserEmail(data.user.email);
+              toast.success('Login successful');
+              return true;
+            } else {
+              toast.error('This account is registered as an organization. Please use organization login.');
+              await supabase.auth.signOut();
+              return false;
+            }
           }
         } else {
           toast.error('Invalid email or password');
           return false;
         }
       } else if (type === 'aadhaar') {
-        // For Aadhaar authentication, we would need to find the user by Aadhaar first
-        // This is a simplified implementation
+        // For Aadhaar authentication
         const { data } = await supabase
           .from('profiles')
           .select('id, email')
@@ -202,15 +230,37 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         }
       } else if (type === 'biometric') {
         // Biometric login would require integration with a biometric API
-        // This is a placeholder for future implementation
         toast.error('Biometric authentication not implemented yet');
         return false;
       } else if (type === 'organization') {
         // Organization login
         if (credentials.orgId && credentials.password) {
-          // In a real app, organizations would have their own auth system
-          toast.error('Organization login not implemented yet');
-          return false;
+          // In a real app, you might have a separate table for organizations
+          // For this demo, we'll use email login but check if it's an organization account
+          const { data, error } = await supabase.auth.signInWithPassword({
+            email: credentials.orgId,
+            password: credentials.password
+          });
+          
+          if (error) {
+            toast.error(error.message);
+            return false;
+          }
+          
+          if (data.user) {
+            // Check if this is indeed an organization account
+            if (data.user.user_metadata?.isOrganization) {
+              setIsAuthenticated(true);
+              setUserType('organization');
+              setUserEmail(data.user.email);
+              toast.success('Organization login successful');
+              return true;
+            } else {
+              toast.error('This account is not registered as an organization');
+              await supabase.auth.signOut();
+              return false;
+            }
+          }
         } else {
           toast.error('Invalid organization credentials');
           return false;
