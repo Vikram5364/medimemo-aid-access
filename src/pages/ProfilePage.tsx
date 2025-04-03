@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { useUserProfile } from '@/hooks/use-user-profile';
 import { AlertCircle, Fingerprint, User, Phone, CalendarDays, Activity, Scale, Ruler, MapPin, Heart, HeartPulse, Pill } from 'lucide-react';
@@ -873,3 +874,38 @@ const ProfilePage: React.FC = () => {
                           Add Your First Allergy
                         </Button>
                       </div>
+                    )}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </div>
+        </TabsContent>
+
+        {/* Biometrics Tab - Reserved for future biometric data and charts */}
+        <TabsContent value="biometrics">
+          <Card>
+            <CardHeader>
+              <CardTitle>Biometric Data</CardTitle>
+              <CardDescription>
+                Track your health metrics over time
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="flex flex-col items-center justify-center py-12 text-center text-gray-500">
+                <Activity className="h-16 w-16 text-gray-300 mb-4" />
+                <h3 className="text-xl font-medium text-gray-600">Biometric Tracking Coming Soon</h3>
+                <p className="text-sm max-w-md mx-auto mt-2 mb-4">
+                  In future updates, you'll be able to track blood pressure, glucose levels, 
+                  cholesterol, and other vital health metrics over time with visual charts.
+                </p>
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+      </Tabs>
+    </div>
+  );
+};
+
+export default ProfilePage;
