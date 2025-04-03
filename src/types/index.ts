@@ -41,6 +41,7 @@ export interface MedicalCondition {
 export interface Allergy {
   name: string;
   severity: string;
+  reaction?: string;
 }
 
 export interface Medication {
@@ -49,6 +50,7 @@ export interface Medication {
   frequency: string;
   startDate: string;
   endDate?: string;
+  prescribedBy?: string;
 }
 
 export interface UserProfile {
