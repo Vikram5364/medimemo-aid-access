@@ -9,7 +9,126 @@ export type Json =
 export type Database = {
   public: {
     Tables: {
-      [_ in never]: never
+      allergies: {
+        Row: {
+          created_at: string
+          id: string
+          name: string
+          severity: string | null
+          user_id: string | null
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          name: string
+          severity?: string | null
+          user_id?: string | null
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          name?: string
+          severity?: string | null
+          user_id?: string | null
+        }
+        Relationships: []
+      }
+      medical_records: {
+        Row: {
+          category: string | null
+          created_at: string
+          date: string
+          description: string | null
+          file_size: number | null
+          file_url: string | null
+          id: string
+          title: string
+          type: string | null
+          user_id: string | null
+        }
+        Insert: {
+          category?: string | null
+          created_at?: string
+          date?: string
+          description?: string | null
+          file_size?: number | null
+          file_url?: string | null
+          id?: string
+          title: string
+          type?: string | null
+          user_id?: string | null
+        }
+        Update: {
+          category?: string | null
+          created_at?: string
+          date?: string
+          description?: string | null
+          file_size?: number | null
+          file_url?: string | null
+          id?: string
+          title?: string
+          type?: string | null
+          user_id?: string | null
+        }
+        Relationships: []
+      }
+      profiles: {
+        Row: {
+          aadhaar: string | null
+          address: string | null
+          blood_group: string | null
+          contact: string | null
+          created_at: string
+          dob: string | null
+          email: string | null
+          emergency_contact_name: string | null
+          emergency_contact_number: string | null
+          emergency_contact_relation: string | null
+          gender: string | null
+          height: number | null
+          id: string
+          name: string | null
+          updated_at: string
+          weight: number | null
+        }
+        Insert: {
+          aadhaar?: string | null
+          address?: string | null
+          blood_group?: string | null
+          contact?: string | null
+          created_at?: string
+          dob?: string | null
+          email?: string | null
+          emergency_contact_name?: string | null
+          emergency_contact_number?: string | null
+          emergency_contact_relation?: string | null
+          gender?: string | null
+          height?: number | null
+          id: string
+          name?: string | null
+          updated_at?: string
+          weight?: number | null
+        }
+        Update: {
+          aadhaar?: string | null
+          address?: string | null
+          blood_group?: string | null
+          contact?: string | null
+          created_at?: string
+          dob?: string | null
+          email?: string | null
+          emergency_contact_name?: string | null
+          emergency_contact_number?: string | null
+          emergency_contact_relation?: string | null
+          gender?: string | null
+          height?: number | null
+          id?: string
+          name?: string | null
+          updated_at?: string
+          weight?: number | null
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never

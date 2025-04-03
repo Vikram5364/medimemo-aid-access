@@ -2,198 +2,160 @@
 import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { z } from 'zod';
-import { zodResolver } from '@hookform/resolvers/zod';
 import { useForm } from 'react-hook-form';
-import { toast } from 'sonner';
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
+import { zodResolver } from '@hookform/resolvers/zod';
+import { Eye, EyeOff, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Activity, Fingerprint, ArrowRight, CheckCircle, Plus, X } from 'lucide-react';
+import { toast } from 'sonner';
+import { useAuth } from '@/hooks/use-auth';
 
-// Define the form schema with Zod
-const formSchema = z.object({
-  name: z.string().min(3, { message: 'Name must be at least 3 characters' }),
-  email: z.string().email({ message: 'Please enter a valid email address' }),
-  password: z.string().min(8, { message: 'Password must be at least 8 characters' }),
+// Form schema with zod validation
+const registerSchema = z.object({
+  name: z.string().min(2, { message: 'Name must be at least 2 characters' }),
+  email: z.string().email({ message: 'Please enter a valid email' }),
+  password: z
+    .string()
+    .min(8, { message: 'Password must be at least 8 characters' })
+    .regex(/[A-Z]/, { message: 'Password must contain at least one uppercase letter' })
+    .regex(/[a-z]/, { message: 'Password must contain at least one lowercase letter' })
+    .regex(/[0-9]/, { message: 'Password must contain at least one number' }),
+  confirmPassword: z.string(),
   aadhaar: z
     .string()
-    .min(12, { message: 'Aadhaar number must be 12 digits' })
-    .max(12, { message: 'Aadhaar number must be 12 digits' })
-    .regex(/^\d+$/, { message: 'Aadhaar number must contain only digits' }),
-  dob: z.string().min(1, { message: 'Date of birth is required' }),
-  gender: z.string().min(1, { message: 'Gender is required' }),
-  bloodGroup: z.string().min(1, { message: 'Blood group is required' }),
-  contact: z.string().min(10, { message: 'Contact number must be at least 10 digits' }),
-  height: z.string().optional(),
-  weight: z.string().optional(),
-  address: z.string().min(1, { message: 'Address is required' }),
-  emergencyContactName: z.string().min(1, { message: 'Emergency contact name is required' }),
-  emergencyContactRelation: z.string().min(1, { message: 'Relationship is required' }),
-  emergencyContactNumber: z.string().min(10, { message: 'Contact number must be at least 10 digits' }),
+    .regex(/^\d{12}$/, { message: 'Aadhaar must be 12 digits' })
+    .optional()
+    .or(z.literal('')),
+  dob: z.string().optional(),
+  gender: z.string().optional(),
+  bloodGroup: z.string().optional(),
+  contact: z
+    .string()
+    .regex(/^\d{10}$/, { message: 'Contact must be 10 digits' })
+    .optional()
+    .or(z.literal('')),
+  address: z.string().optional(),
+  emergencyContactName: z.string().optional(),
+  emergencyContactRelation: z.string().optional(),
+  emergencyContactNumber: z
+    .string()
+    .regex(/^\d{10}$/, { message: 'Emergency contact must be 10 digits' })
+    .optional()
+    .or(z.literal(''))
+}).refine(data => data.password === data.confirmPassword, {
+  message: "Passwords don't match",
+  path: ['confirmPassword'],
 });
 
-const RegisterForm = () => {
-  const navigate = useNavigate();
-  const [currentStep, setCurrentStep] = useState<'biodata' | 'biometric'>('biodata');
-  const [isFingerScanActive, setIsFingerScanActive] = useState(false);
-  const [scannedFingers, setScannedFingers] = useState<string[]>([]);
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const [allergies, setAllergies] = useState<{name: string, severity: string}[]>([]);
-  const [newAllergyName, setNewAllergyName] = useState('');
-  const [newAllergySeverity, setNewAllergySeverity] = useState('mild');
+type RegisterFormValues = z.infer<typeof registerSchema>;
 
-  const form = useForm<z.infer<typeof formSchema>>({
-    resolver: zodResolver(formSchema),
+const RegisterForm = () => {
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+  const navigate = useNavigate();
+  const { register, isLoading } = useAuth();
+
+  const form = useForm<RegisterFormValues>({
+    resolver: zodResolver(registerSchema),
     defaultValues: {
       name: '',
       email: '',
       password: '',
+      confirmPassword: '',
       aadhaar: '',
       dob: '',
       gender: '',
       bloodGroup: '',
       contact: '',
-      height: '',
-      weight: '',
       address: '',
       emergencyContactName: '',
       emergencyContactRelation: '',
-      emergencyContactNumber: '',
-    },
+      emergencyContactNumber: ''
+    }
   });
 
-  const addAllergy = () => {
-    if (newAllergyName.trim()) {
-      setAllergies([...allergies, {name: newAllergyName.trim(), severity: newAllergySeverity}]);
-      setNewAllergyName('');
-      setNewAllergySeverity('mild');
-    }
-  };
-
-  const removeAllergy = (index: number) => {
-    const updatedAllergies = [...allergies];
-    updatedAllergies.splice(index, 1);
-    setAllergies(updatedAllergies);
-  };
-
-  const handleSubmit = async (values: z.infer<typeof formSchema>) => {
-    if (currentStep === 'biodata') {
-      setCurrentStep('biometric');
-      return;
-    }
-
-    if (scannedFingers.length < 10) {
-      toast.error('Please complete the biometric enrollment for all fingers');
-      return;
-    }
-
-    setIsSubmitting(true);
-    
-    // Store user information in localStorage to simulate a database
-    const userData = {
-      ...values,
-      allergies,
-      fingerprints: scannedFingers,
-      registrationDate: new Date().toISOString()
-    };
-    
-    // Simulate registration process
-    setTimeout(() => {
-      // Store user data and fingerprints in localStorage for demo purposes
-      localStorage.setItem('userData', JSON.stringify(userData));
-      localStorage.setItem('userFingerprints', JSON.stringify(scannedFingers));
-      localStorage.setItem('userEmail', values.email);
-      localStorage.setItem('userAadhaar', values.aadhaar);
-      localStorage.setItem('isAuthenticated', 'true');
-      localStorage.setItem('userType', 'individual');
+  const onSubmit = async (data: RegisterFormValues) => {
+    try {
+      const success = await register(data.email, data.password, {
+        name: data.name,
+        aadhaar: data.aadhaar,
+        dob: data.dob,
+        gender: data.gender,
+        bloodGroup: data.bloodGroup,
+        contact: data.contact,
+        address: data.address,
+        emergencyContactName: data.emergencyContactName,
+        emergencyContactRelation: data.emergencyContactRelation,
+        emergencyContactNumber: data.emergencyContactNumber
+      });
       
-      toast.success('Registration successful!');
-      navigate('/dashboard');
-      setIsSubmitting(false);
-    }, 2000);
+      if (success) {
+        // Navigate to login page or verify email page
+        navigate('/login');
+      }
+    } catch (error: any) {
+      console.error('Registration error:', error);
+      toast.error(error.message || 'An error occurred during registration');
+    }
   };
 
-  const fingerPositions = [
-    'Right Thumb',
-    'Right Index',
-    'Right Middle',
-    'Right Ring',
-    'Right Little',
-    'Left Thumb',
-    'Left Index',
-    'Left Middle',
-    'Left Ring',
-    'Left Little'
-  ];
+  const togglePasswordVisibility = () => {
+    setShowPassword(!showPassword);
+  };
 
-  const simulateFingerprintScan = (fingerPosition: string) => {
-    if (scannedFingers.includes(fingerPosition)) {
-      return;
-    }
-
-    setIsFingerScanActive(true);
-    
-    // Simulate fingerprint scanning
-    setTimeout(() => {
-      setScannedFingers(prev => [...prev, fingerPosition]);
-      setIsFingerScanActive(false);
-      toast.success(`${fingerPosition} scanned successfully`);
-    }, 1500);
+  const toggleConfirmPasswordVisibility = () => {
+    setShowConfirmPassword(!showConfirmPassword);
   };
 
   return (
-    <Card className="w-full shadow-lg">
+    <Card className="w-full max-w-md mx-auto">
       <CardHeader className="space-y-1">
-        <div className="flex items-center gap-2">
-          <Activity className="h-6 w-6 text-medimemo-primary" />
-          <CardTitle className="text-2xl font-bold">Create your MediMemo account</CardTitle>
-        </div>
-        <CardDescription>
-          Register with Aadhaar to securely store and access your medical records
+        <CardTitle className="text-2xl font-bold text-center">Create an Account</CardTitle>
+        <CardDescription className="text-center">
+          Enter your information to create your MediMemo account
         </CardDescription>
       </CardHeader>
       <CardContent>
-        <Tabs value={currentStep} className="w-full">
-          <TabsList className="grid w-full grid-cols-2">
-            <TabsTrigger value="biodata" disabled={currentStep === 'biometric'}>Personal Information</TabsTrigger>
-            <TabsTrigger value="biometric" disabled={currentStep === 'biodata'}>Biometric Enrollment</TabsTrigger>
+        <Tabs defaultValue="individual" className="w-full">
+          <TabsList className="grid w-full grid-cols-2 mb-4">
+            <TabsTrigger value="individual">Individual</TabsTrigger>
+            <TabsTrigger value="organization">Organization</TabsTrigger>
           </TabsList>
           
-          <TabsContent value="biodata">
+          <TabsContent value="individual">
             <Form {...form}>
-              <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-4">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <FormField
-                    control={form.control}
-                    name="name"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Full Name</FormLabel>
-                        <FormControl>
-                          <Input placeholder="Enter your full name" {...field} />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                  
-                  <FormField
-                    control={form.control}
-                    name="email"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Email</FormLabel>
-                        <FormControl>
-                          <Input type="email" placeholder="Enter your email" {...field} />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                </div>
+              <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+                <FormField
+                  control={form.control}
+                  name="name"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Full Name</FormLabel>
+                      <FormControl>
+                        <Input placeholder="John Doe" {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                
+                <FormField
+                  control={form.control}
+                  name="email"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Email</FormLabel>
+                      <FormControl>
+                        <Input type="email" placeholder="john.doe@example.com" {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
                 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <FormField
@@ -203,7 +165,20 @@ const RegisterForm = () => {
                       <FormItem>
                         <FormLabel>Password</FormLabel>
                         <FormControl>
-                          <Input type="password" placeholder="Create a password" {...field} />
+                          <div className="relative">
+                            <Input
+                              type={showPassword ? "text" : "password"}
+                              placeholder="********"
+                              {...field}
+                            />
+                            <button
+                              type="button"
+                              className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-500"
+                              onClick={togglePasswordVisibility}
+                            >
+                              {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                            </button>
+                          </div>
                         </FormControl>
                         <FormMessage />
                       </FormItem>
@@ -212,21 +187,25 @@ const RegisterForm = () => {
                   
                   <FormField
                     control={form.control}
-                    name="aadhaar"
+                    name="confirmPassword"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>Aadhaar Number</FormLabel>
+                        <FormLabel>Confirm Password</FormLabel>
                         <FormControl>
-                          <Input 
-                            placeholder="12-digit Aadhaar Number" 
-                            {...field}
-                            onChange={(e) => {
-                              const value = e.target.value.replace(/\D/g, '');
-                              if (value.length <= 12) {
-                                field.onChange(value);
-                              }
-                            }}
-                          />
+                          <div className="relative">
+                            <Input
+                              type={showConfirmPassword ? "text" : "password"}
+                              placeholder="********"
+                              {...field}
+                            />
+                            <button
+                              type="button"
+                              className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-500"
+                              onClick={toggleConfirmPasswordVisibility}
+                            >
+                              {showConfirmPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                            </button>
+                          </div>
                         </FormControl>
                         <FormMessage />
                       </FormItem>
@@ -234,7 +213,21 @@ const RegisterForm = () => {
                   />
                 </div>
                 
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <FormField
+                  control={form.control}
+                  name="aadhaar"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Aadhaar Number (Optional)</FormLabel>
+                      <FormControl>
+                        <Input placeholder="123456789012" {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <FormField
                     control={form.control}
                     name="dob"
@@ -255,10 +248,7 @@ const RegisterForm = () => {
                     render={({ field }) => (
                       <FormItem>
                         <FormLabel>Gender</FormLabel>
-                        <Select 
-                          onValueChange={field.onChange} 
-                          defaultValue={field.value}
-                        >
+                        <Select onValueChange={field.onChange} defaultValue={field.value}>
                           <FormControl>
                             <SelectTrigger>
                               <SelectValue placeholder="Select gender" />
@@ -274,309 +264,79 @@ const RegisterForm = () => {
                       </FormItem>
                     )}
                   />
-                  
-                  <FormField
-                    control={form.control}
-                    name="bloodGroup"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Blood Group</FormLabel>
-                        <Select 
-                          onValueChange={field.onChange} 
-                          defaultValue={field.value}
-                        >
-                          <FormControl>
-                            <SelectTrigger>
-                              <SelectValue placeholder="Select blood group" />
-                            </SelectTrigger>
-                          </FormControl>
-                          <SelectContent>
-                            <SelectItem value="A+">A+</SelectItem>
-                            <SelectItem value="A-">A-</SelectItem>
-                            <SelectItem value="B+">B+</SelectItem>
-                            <SelectItem value="B-">B-</SelectItem>
-                            <SelectItem value="AB+">AB+</SelectItem>
-                            <SelectItem value="AB-">AB-</SelectItem>
-                            <SelectItem value="O+">O+</SelectItem>
-                            <SelectItem value="O-">O-</SelectItem>
-                          </SelectContent>
-                        </Select>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                </div>
-                
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                  <FormField
-                    control={form.control}
-                    name="contact"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Contact Number</FormLabel>
-                        <FormControl>
-                          <Input placeholder="Your phone number" {...field} />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                  
-                  <FormField
-                    control={form.control}
-                    name="height"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Height (cm)</FormLabel>
-                        <FormControl>
-                          <Input type="number" placeholder="Height in cm" {...field} />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                  
-                  <FormField
-                    control={form.control}
-                    name="weight"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Weight (kg)</FormLabel>
-                        <FormControl>
-                          <Input type="number" placeholder="Weight in kg" {...field} />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
                 </div>
                 
                 <FormField
                   control={form.control}
-                  name="address"
+                  name="bloodGroup"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Address</FormLabel>
-                      <FormControl>
-                        <Input placeholder="Your current address" {...field} />
-                      </FormControl>
+                      <FormLabel>Blood Group</FormLabel>
+                      <Select onValueChange={field.onChange} defaultValue={field.value}>
+                        <FormControl>
+                          <SelectTrigger>
+                            <SelectValue placeholder="Select blood group" />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          <SelectItem value="A+">A+</SelectItem>
+                          <SelectItem value="A-">A-</SelectItem>
+                          <SelectItem value="B+">B+</SelectItem>
+                          <SelectItem value="B-">B-</SelectItem>
+                          <SelectItem value="AB+">AB+</SelectItem>
+                          <SelectItem value="AB-">AB-</SelectItem>
+                          <SelectItem value="O+">O+</SelectItem>
+                          <SelectItem value="O-">O-</SelectItem>
+                        </SelectContent>
+                      </Select>
                       <FormMessage />
                     </FormItem>
                   )}
                 />
                 
-                {/* Allergies Section */}
-                <div className="bg-yellow-50 p-4 rounded-md mt-4">
-                  <h3 className="text-md font-semibold mb-3">Allergies</h3>
-                  <div className="space-y-2">
-                    <div className="flex flex-wrap gap-2 mb-2">
-                      {allergies.map((allergy, index) => (
-                        <div 
-                          key={index} 
-                          className={`flex items-center px-3 py-1 rounded-full text-sm 
-                            ${allergy.severity === 'severe' ? 'bg-red-100 text-red-800' : 
-                              allergy.severity === 'moderate' ? 'bg-orange-100 text-orange-800' : 
-                                'bg-yellow-100 text-yellow-800'}`}
-                        >
-                          <span>{allergy.name}</span>
-                          <span className="text-xs ml-1">({allergy.severity})</span>
-                          <Button 
-                            type="button" 
-                            variant="ghost" 
-                            size="sm" 
-                            className="h-5 w-5 p-0 ml-1 text-gray-500 hover:text-red-500"
-                            onClick={() => removeAllergy(index)}
-                          >
-                            <X size={14} />
-                          </Button>
-                        </div>
-                      ))}
-                    </div>
-                    
-                    <div className="flex gap-2">
-                      <Input 
-                        placeholder="Allergy name" 
-                        value={newAllergyName}
-                        onChange={(e) => setNewAllergyName(e.target.value)}
-                        className="flex-grow"
-                      />
-                      <Select 
-                        value={newAllergySeverity}
-                        onValueChange={setNewAllergySeverity}
-                      >
-                        <SelectTrigger className="w-32">
-                          <SelectValue placeholder="Severity" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="mild">Mild</SelectItem>
-                          <SelectItem value="moderate">Moderate</SelectItem>
-                          <SelectItem value="severe">Severe</SelectItem>
-                        </SelectContent>
-                      </Select>
-                      <Button 
-                        type="button" 
-                        size="sm" 
-                        onClick={addAllergy}
-                        disabled={!newAllergyName.trim()}
-                      >
-                        <Plus size={16} />
-                      </Button>
-                    </div>
-                  </div>
-                </div>
-                
-                <div className="bg-blue-50 p-4 rounded-md mt-6">
-                  <h3 className="text-md font-semibold mb-3">Emergency Contact</h3>
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                    <FormField
-                      control={form.control}
-                      name="emergencyContactName"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Name</FormLabel>
-                          <FormControl>
-                            <Input placeholder="Contact name" {...field} />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                    
-                    <FormField
-                      control={form.control}
-                      name="emergencyContactRelation"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Relationship</FormLabel>
-                          <Select 
-                            onValueChange={field.onChange} 
-                            defaultValue={field.value}
-                          >
-                            <FormControl>
-                              <SelectTrigger>
-                                <SelectValue placeholder="Relationship" />
-                              </SelectTrigger>
-                            </FormControl>
-                            <SelectContent>
-                              <SelectItem value="spouse">Spouse</SelectItem>
-                              <SelectItem value="parent">Parent</SelectItem>
-                              <SelectItem value="child">Child</SelectItem>
-                              <SelectItem value="sibling">Sibling</SelectItem>
-                              <SelectItem value="relative">Other Relative</SelectItem>
-                              <SelectItem value="friend">Friend</SelectItem>
-                            </SelectContent>
-                          </Select>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                    
-                    <FormField
-                      control={form.control}
-                      name="emergencyContactNumber"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Contact Number</FormLabel>
-                          <FormControl>
-                            <Input placeholder="Contact phone number" {...field} />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                  </div>
-                </div>
-                
-                <Button 
-                  type="submit" 
-                  className="w-full"
-                >
-                  Continue to Biometric Enrollment
-                  <ArrowRight className="ml-2 h-4 w-4" />
+                <Button type="submit" className="w-full" disabled={isLoading}>
+                  {isLoading ? (
+                    <>
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      Creating Account...
+                    </>
+                  ) : (
+                    "Create Account"
+                  )}
                 </Button>
               </form>
             </Form>
           </TabsContent>
           
-          <TabsContent value="biometric">
-            <div className="space-y-6">
-              <div className="bg-blue-50 p-4 rounded-md">
-                <h3 className="text-md font-semibold flex items-center mb-2">
-                  <Fingerprint className="h-5 w-5 mr-2 text-medimemo-primary" />
-                  Fingerprint Enrollment
-                </h3>
-                <p className="text-sm text-gray-600 mb-4">
-                  Please scan all 10 fingerprints for complete biometric enrollment. 
-                  This will allow emergency healthcare access through fingerprint identification.
-                </p>
-                
-                <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
-                  {fingerPositions.map((finger) => (
-                    <div 
-                      key={finger} 
-                      className={`border rounded-md p-3 cursor-pointer transition-all
-                        ${scannedFingers.includes(finger) 
-                          ? 'bg-green-50 border-green-200' 
-                          : 'bg-white border-gray-200 hover:border-blue-300'}
-                        ${isFingerScanActive ? 'pointer-events-none opacity-50' : ''}
-                      `}
-                      onClick={() => simulateFingerprintScan(finger)}
-                    >
-                      <div className="flex flex-col items-center">
-                        {scannedFingers.includes(finger) ? (
-                          <CheckCircle className="h-10 w-10 text-green-500 mb-2" />
-                        ) : (
-                          <Fingerprint className={`h-10 w-10 ${isFingerScanActive ? 'animate-pulse text-blue-500' : 'text-gray-400'} mb-2`} />
-                        )}
-                        <p className="text-xs text-center font-medium">{finger}</p>
-                        {scannedFingers.includes(finger) && (
-                          <span className="text-xs text-green-600 mt-1">Scanned</span>
-                        )}
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-              
-              <div className="flex justify-between">
-                <Button 
-                  type="button" 
-                  variant="outline"
-                  onClick={() => setCurrentStep('biodata')}
-                  disabled={isFingerScanActive || isSubmitting}
-                >
-                  Back to Personal Information
-                </Button>
-                
-                <Button 
-                  type="button"
-                  onClick={form.handleSubmit(handleSubmit)}
-                  disabled={scannedFingers.length < 10 || isFingerScanActive || isSubmitting}
-                  className={scannedFingers.length < 10 ? 'opacity-50' : ''}
-                >
-                  {isSubmitting ? 'Registering...' : 'Complete Registration'}
-                </Button>
-              </div>
-              
-              {scannedFingers.length < 10 && (
-                <p className="text-sm text-amber-600 text-center mt-2">
-                  Please scan all 10 fingerprints to complete registration ({scannedFingers.length}/10 completed)
-                </p>
-              )}
+          <TabsContent value="organization">
+            <div className="text-center py-8">
+              <p className="text-sm text-muted-foreground mb-4">
+                Organization registration is currently available through our verification process.
+              </p>
+              <Button variant="outline" disabled>
+                Coming Soon
+              </Button>
             </div>
           </TabsContent>
         </Tabs>
       </CardContent>
-      <CardFooter className="flex flex-col space-y-4">
-        <div className="text-sm text-gray-500 text-center w-full">
-          By registering, you agree to MediMemo's Terms of Service and Privacy Policy
-        </div>
-        <div className="text-sm text-center w-full">
-          Already have an account?{' '}
-          <Link to="/login" className="text-medimemo-primary hover:underline">
-            Login here
+      <CardFooter className="flex flex-col">
+        <p className="text-sm text-muted-foreground text-center">
+          Already have an account?{" "}
+          <Link to="/login" className="text-primary underline underline-offset-4 hover:text-primary/90">
+            Sign In
           </Link>
-        </div>
+        </p>
+        <p className="text-xs text-muted-foreground text-center mt-2">
+          By creating an account, you agree to our{" "}
+          <Link to="/terms-of-service" className="underline underline-offset-4 hover:text-primary">
+            Terms of Service
+          </Link>{" "}
+          and{" "}
+          <Link to="/privacy-policy" className="underline underline-offset-4 hover:text-primary">
+            Privacy Policy
+          </Link>
+        </p>
       </CardFooter>
     </Card>
   );

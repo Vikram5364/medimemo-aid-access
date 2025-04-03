@@ -2,6 +2,7 @@
 import { useState, useEffect, createContext, useContext, ReactNode } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
+import { supabase } from '@/integrations/supabase/client';
 
 interface AuthContextType {
   isAuthenticated: boolean;
@@ -9,6 +10,7 @@ interface AuthContextType {
   userEmail: string | null;
   userAadhaar: string | null;
   login: (type: 'email' | 'aadhaar' | 'biometric' | 'organization', credentials: any) => Promise<boolean>;
+  register: (email: string, password: string, userData?: any) => Promise<boolean>;
   logout: () => void;
   isLoading: boolean;
 }
@@ -25,33 +27,124 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
   // Check for existing authentication on mount
   useEffect(() => {
-    const storedIsAuthenticated = localStorage.getItem('isAuthenticated') === 'true';
-    const storedUserType = localStorage.getItem('userType') as 'individual' | 'organization' | null;
-    const storedUserEmail = localStorage.getItem('userEmail');
-    const storedUserAadhaar = localStorage.getItem('userAadhaar');
-
-    setIsAuthenticated(storedIsAuthenticated);
-    setUserType(storedUserType);
-    setUserEmail(storedUserEmail);
-    setUserAadhaar(storedUserAadhaar);
-    setIsLoading(false);
+    const checkSession = async () => {
+      try {
+        const { data } = await supabase.auth.getSession();
+        const session = data.session;
+        
+        if (session) {
+          setIsAuthenticated(true);
+          setUserEmail(session.user.email);
+          setUserType('individual'); // Default to individual for now
+          
+          // Retrieve Aadhaar if available
+          const { data: profileData } = await supabase
+            .from('profiles')
+            .select('aadhaar')
+            .eq('id', session.user.id)
+            .single();
+            
+          if (profileData && profileData.aadhaar) {
+            setUserAadhaar(profileData.aadhaar);
+          }
+        }
+      } catch (error) {
+        console.error('Session check error:', error);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+    
+    checkSession();
+    
+    // Set up auth state listener
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(
+      async (event, session) => {
+        setIsAuthenticated(!!session);
+        setUserEmail(session?.user?.email || null);
+        
+        if (session) {
+          setUserType('individual'); // Default to individual for now
+          
+          // Try to get Aadhaar from profile
+          const { data: profileData } = await supabase
+            .from('profiles')
+            .select('aadhaar')
+            .eq('id', session.user.id)
+            .single();
+            
+          if (profileData && profileData.aadhaar) {
+            setUserAadhaar(profileData.aadhaar);
+          }
+        } else {
+          setUserType(null);
+          setUserAadhaar(null);
+        }
+      }
+    );
+    
+    return () => {
+      subscription.unsubscribe();
+    };
   }, []);
 
-  // Function to check if a user exists
-  const checkUserExists = (email: string): boolean => {
-    // In a real app, this would be an API call to the database
-    // For now, we'll simulate checking localStorage for registered users
-    const registeredUsers = localStorage.getItem('registeredUsers');
-    if (registeredUsers) {
-      try {
-        const users = JSON.parse(registeredUsers);
-        return users.some((user: any) => user.email === email);
-      } catch (error) {
-        console.error('Error parsing registered users:', error);
+  const register = async (email: string, password: string, userData?: any): Promise<boolean> => {
+    setIsLoading(true);
+    
+    try {
+      const { data, error } = await supabase.auth.signUp({
+        email,
+        password,
+        options: {
+          data: {
+            name: userData?.name,
+            aadhaar: userData?.aadhaar
+          }
+        }
+      });
+      
+      if (error) {
+        toast.error(error.message);
         return false;
       }
+      
+      if (data.user) {
+        // Update profile with additional user data
+        if (userData) {
+          const { error: profileError } = await supabase
+            .from('profiles')
+            .update({
+              name: userData.name,
+              aadhaar: userData.aadhaar,
+              dob: userData.dob,
+              gender: userData.gender,
+              blood_group: userData.bloodGroup,
+              contact: userData.contact,
+              address: userData.address,
+              emergency_contact_name: userData.emergencyContactName,
+              emergency_contact_relation: userData.emergencyContactRelation,
+              emergency_contact_number: userData.emergencyContactNumber
+            })
+            .eq('id', data.user.id);
+            
+          if (profileError) {
+            console.error('Error updating profile:', profileError);
+            toast.error('Registration successful but profile update failed');
+          }
+        }
+        
+        toast.success('Registration successful! Please check your email to verify your account.');
+        return true;
+      }
+      
+      return false;
+    } catch (error: any) {
+      console.error('Registration error:', error);
+      toast.error(error.message || 'An error occurred during registration');
+      return false;
+    } finally {
+      setIsLoading(false);
     }
-    return false;
   };
 
   const login = async (
@@ -60,135 +153,102 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   ): Promise<boolean> => {
     setIsLoading(true);
     
-    return new Promise((resolve) => {
-      // Simulate API call with setTimeout
-      setTimeout(() => {
-        try {
-          if (type === 'email') {
-            // Email-based login for individuals
-            if (credentials.email && credentials.password) {
-              // Check if the user exists in our "database"
-              const userExists = checkUserExists(credentials.email);
-              
-              if (!userExists) {
-                toast.error('Email not registered. Please sign up first.');
-                setIsLoading(false);
-                resolve(false);
-                return;
-              }
-              
-              localStorage.setItem('isAuthenticated', 'true');
-              localStorage.setItem('userType', 'individual');
-              localStorage.setItem('userEmail', credentials.email);
-              localStorage.setItem('authMethod', 'email');
-              
-              setIsAuthenticated(true);
-              setUserType('individual');
-              setUserEmail(credentials.email);
-              toast.success('Login successful');
-              resolve(true);
-            } else {
-              toast.error('Invalid email or password');
-              resolve(false);
-            }
-          } else if (type === 'aadhaar') {
-            // Aadhaar-based login for individuals
-            if (credentials.aadhaar) {
-              // In a real app, verify if this Aadhaar is registered
-              // For now, we'll simulate this
-              
-              localStorage.setItem('isAuthenticated', 'true');
-              localStorage.setItem('userType', 'individual');
-              localStorage.setItem('userAadhaar', credentials.aadhaar);
-              localStorage.setItem('authMethod', 'aadhaar');
-              
-              setIsAuthenticated(true);
-              setUserType('individual');
-              setUserAadhaar(credentials.aadhaar);
-              toast.success('Aadhaar verification successful');
-              resolve(true);
-            } else {
-              toast.error('Invalid Aadhaar number');
-              resolve(false);
-            }
-          } else if (type === 'biometric') {
-            // Biometric login for individuals
-            const storedFingerprints = localStorage.getItem('userFingerprints');
-            
-            if (storedFingerprints) {
-              localStorage.setItem('isAuthenticated', 'true');
-              localStorage.setItem('userType', 'individual');
-              localStorage.setItem('authMethod', 'biometric');
-              
-              // Try to get the user email or Aadhaar from localStorage
-              // This simulates matching the fingerprint to a user
-              const userEmail = localStorage.getItem('userEmail');
-              const userAadhaar = localStorage.getItem('userAadhaar');
-              
-              if (userEmail) {
-                setUserEmail(userEmail);
-              }
-              
-              if (userAadhaar) {
-                setUserAadhaar(userAadhaar);
-              }
-              
-              setIsAuthenticated(true);
-              setUserType('individual');
-              toast.success('Biometric authentication successful');
-              resolve(true);
-            } else {
-              toast.error('Biometric data not found');
-              resolve(false);
-            }
-          } else if (type === 'organization') {
-            // Organization login
-            if (credentials.orgId && credentials.password) {
-              // In a real app, verify if this organization is registered
-              
-              localStorage.setItem('isAuthenticated', 'true');
-              localStorage.setItem('userType', 'organization');
-              localStorage.setItem('orgId', credentials.orgId);
-              localStorage.setItem('authMethod', 'organization');
-              
-              setIsAuthenticated(true);
-              setUserType('organization');
-              toast.success('Organization login successful');
-              resolve(true);
-            } else {
-              toast.error('Invalid organization credentials');
-              resolve(false);
-            }
-          } else {
-            toast.error('Invalid login method');
-            resolve(false);
+    try {
+      if (type === 'email') {
+        // Email-based login for individuals
+        if (credentials.email && credentials.password) {
+          const { data, error } = await supabase.auth.signInWithPassword({
+            email: credentials.email,
+            password: credentials.password
+          });
+          
+          if (error) {
+            toast.error(error.message);
+            return false;
           }
-        } catch (error) {
-          console.error('Login error:', error);
-          toast.error('An error occurred during login');
-          resolve(false);
-        } finally {
-          setIsLoading(false);
+          
+          if (data.user) {
+            setIsAuthenticated(true);
+            setUserType('individual');
+            setUserEmail(data.user.email);
+            toast.success('Login successful');
+            return true;
+          }
+        } else {
+          toast.error('Invalid email or password');
+          return false;
         }
-      }, 1000);
-    });
+      } else if (type === 'aadhaar') {
+        // For Aadhaar authentication, we would need to find the user by Aadhaar first
+        // This is a simplified implementation
+        const { data } = await supabase
+          .from('profiles')
+          .select('id, email')
+          .eq('aadhaar', credentials.aadhaar)
+          .single();
+          
+        if (data && data.email) {
+          // For this demo, we'll let them in with just the Aadhaar
+          // In a real app, you would need additional verification
+          toast.success('Aadhaar verification successful');
+          setIsAuthenticated(true);
+          setUserType('individual');
+          setUserAadhaar(credentials.aadhaar);
+          return true;
+        } else {
+          toast.error('Invalid Aadhaar number');
+          return false;
+        }
+      } else if (type === 'biometric') {
+        // Biometric login would require integration with a biometric API
+        // This is a placeholder for future implementation
+        toast.error('Biometric authentication not implemented yet');
+        return false;
+      } else if (type === 'organization') {
+        // Organization login
+        if (credentials.orgId && credentials.password) {
+          // In a real app, organizations would have their own auth system
+          toast.error('Organization login not implemented yet');
+          return false;
+        } else {
+          toast.error('Invalid organization credentials');
+          return false;
+        }
+      } else {
+        toast.error('Invalid login method');
+        return false;
+      }
+      
+      return false;
+    } catch (error: any) {
+      console.error('Login error:', error);
+      toast.error(error.message || 'An error occurred during login');
+      return false;
+    } finally {
+      setIsLoading(false);
+    }
   };
 
-  const logout = () => {
-    localStorage.removeItem('isAuthenticated');
-    localStorage.removeItem('userType');
-    localStorage.removeItem('userEmail');
-    localStorage.removeItem('userAadhaar');
-    localStorage.removeItem('orgId');
-    localStorage.removeItem('authMethod');
-    
-    setIsAuthenticated(false);
-    setUserType(null);
-    setUserEmail(null);
-    setUserAadhaar(null);
-    
-    toast.success('Logged out successfully');
-    navigate('/');
+  const logout = async () => {
+    try {
+      const { error } = await supabase.auth.signOut();
+      
+      if (error) {
+        toast.error(error.message);
+        return;
+      }
+      
+      setIsAuthenticated(false);
+      setUserType(null);
+      setUserEmail(null);
+      setUserAadhaar(null);
+      
+      toast.success('Logged out successfully');
+      navigate('/');
+    } catch (error: any) {
+      console.error('Logout error:', error);
+      toast.error(error.message || 'An error occurred during logout');
+    }
   };
 
   return (
@@ -199,6 +259,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         userEmail,
         userAadhaar,
         login,
+        register,
         logout,
         isLoading
       }}
