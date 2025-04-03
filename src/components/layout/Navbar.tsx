@@ -4,6 +4,7 @@ import { Link } from 'react-router-dom';
 import { Activity, Bell, Menu, Search, User } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { ThemeToggle } from '@/components/ui/theme-toggle';
 
 interface NavbarProps {
   isAuthenticated?: boolean;
@@ -13,7 +14,7 @@ const Navbar: React.FC<NavbarProps> = ({ isAuthenticated = false }) => {
   const [isMenuOpen, setIsMenuOpen] = React.useState(false);
 
   return (
-    <nav className="bg-white shadow-sm border-b border-gray-200">
+    <nav className="bg-white shadow-sm border-b border-gray-200 dark:bg-gray-900 dark:border-gray-800">
       <div className="medimemo-container py-3">
         <div className="flex items-center justify-between">
           <div className="flex items-center">
@@ -36,7 +37,8 @@ const Navbar: React.FC<NavbarProps> = ({ isAuthenticated = false }) => {
                 </div>
               </div>
 
-              <div className="hidden md:flex items-center gap-2">
+              <div className="hidden md:flex items-center gap-4">
+                <ThemeToggle />
                 <Button variant="ghost" size="icon">
                   <Bell size={20} />
                 </Button>
@@ -58,7 +60,8 @@ const Navbar: React.FC<NavbarProps> = ({ isAuthenticated = false }) => {
               </Button>
             </>
           ) : (
-            <div className="flex items-center gap-3">
+            <div className="flex items-center gap-4">
+              <ThemeToggle />
               <Link to="/login">
                 <Button variant="outline">Login</Button>
               </Link>
@@ -81,14 +84,17 @@ const Navbar: React.FC<NavbarProps> = ({ isAuthenticated = false }) => {
                 <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" size={18} />
               </div>
             </div>
+            <div className="flex items-center mb-4">
+              <ThemeToggle />
+            </div>
             <div className="flex flex-col space-y-2">
-              <Link to="/dashboard" className="text-gray-600 hover:text-medimemo-primary py-2">
+              <Link to="/dashboard" className="text-gray-600 hover:text-medimemo-primary py-2 dark:text-gray-300 dark:hover:text-medimemo-primary">
                 Dashboard
               </Link>
-              <Link to="/profile" className="text-gray-600 hover:text-medimemo-primary py-2">
+              <Link to="/profile" className="text-gray-600 hover:text-medimemo-primary py-2 dark:text-gray-300 dark:hover:text-medimemo-primary">
                 My Profile
               </Link>
-              <Link to="/emergency-access" className="text-red-600 hover:text-red-800 py-2">
+              <Link to="/emergency-access" className="text-red-600 hover:text-red-800 py-2 dark:text-red-400 dark:hover:text-red-300">
                 Emergency Access
               </Link>
             </div>

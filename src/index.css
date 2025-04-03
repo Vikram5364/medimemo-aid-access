@@ -102,7 +102,7 @@
   }
   
   .medimemo-card {
-    @apply bg-white rounded-lg shadow-md transition-shadow hover:shadow-lg;
+    @apply bg-white dark:bg-gray-800 rounded-lg shadow-md transition-shadow hover:shadow-lg;
   }
   
   .medimemo-btn-primary {
@@ -118,15 +118,15 @@
   }
   
   .medimemo-input {
-    @apply border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-medimemo-primary;
+    @apply border border-gray-300 dark:border-gray-700 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-medimemo-primary dark:bg-gray-800 dark:text-white;
   }
 
   .medimemo-heading {
-    @apply text-2xl font-bold text-medimemo-dark;
+    @apply text-2xl font-bold text-medimemo-dark dark:text-white;
   }
   
   .medimemo-subheading {
-    @apply text-lg font-semibold text-medimemo-dark;
+    @apply text-lg font-semibold text-medimemo-dark dark:text-gray-200;
   }
   
   .medimemo-card-grid {

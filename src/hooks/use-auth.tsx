@@ -37,6 +37,23 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     setIsLoading(false);
   }, []);
 
+  // Function to check if a user exists
+  const checkUserExists = (email: string): boolean => {
+    // In a real app, this would be an API call to the database
+    // For now, we'll simulate checking localStorage for registered users
+    const registeredUsers = localStorage.getItem('registeredUsers');
+    if (registeredUsers) {
+      try {
+        const users = JSON.parse(registeredUsers);
+        return users.some((user: any) => user.email === email);
+      } catch (error) {
+        console.error('Error parsing registered users:', error);
+        return false;
+      }
+    }
+    return false;
+  };
+
   const login = async (
     type: 'email' | 'aadhaar' | 'biometric' | 'organization', 
     credentials: any
@@ -50,6 +67,16 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           if (type === 'email') {
             // Email-based login for individuals
             if (credentials.email && credentials.password) {
+              // Check if the user exists in our "database"
+              const userExists = checkUserExists(credentials.email);
+              
+              if (!userExists) {
+                toast.error('Email not registered. Please sign up first.');
+                setIsLoading(false);
+                resolve(false);
+                return;
+              }
+              
               localStorage.setItem('isAuthenticated', 'true');
               localStorage.setItem('userType', 'individual');
               localStorage.setItem('userEmail', credentials.email);
@@ -67,6 +94,9 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           } else if (type === 'aadhaar') {
             // Aadhaar-based login for individuals
             if (credentials.aadhaar) {
+              // In a real app, verify if this Aadhaar is registered
+              // For now, we'll simulate this
+              
               localStorage.setItem('isAuthenticated', 'true');
               localStorage.setItem('userType', 'individual');
               localStorage.setItem('userAadhaar', credentials.aadhaar);
@@ -114,6 +144,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           } else if (type === 'organization') {
             // Organization login
             if (credentials.orgId && credentials.password) {
+              // In a real app, verify if this organization is registered
+              
               localStorage.setItem('isAuthenticated', 'true');
               localStorage.setItem('userType', 'organization');
               localStorage.setItem('orgId', credentials.orgId);
