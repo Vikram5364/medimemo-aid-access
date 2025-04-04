@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
@@ -115,7 +114,7 @@ const RegisterForm = () => {
       case 'complete':
         return (
           <RegistrationComplete 
-            fingerprintsCount={fingerprints.length} 
+            fingerprints={fingerprints} 
             onComplete={completeRegistration} 
             onBack={() => setRegistrationStep('form')}
             isLoading={isLoading}
