@@ -6,8 +6,17 @@ import { Button } from '@/components/ui/button';
 import { Progress } from '@/components/ui/progress';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { toast } from 'sonner';
+import { cn } from '@/lib/utils';
 import { useUserProfile } from '@/hooks/use-user-profile';
-import { FingerPosition, FingerprintData, fingerPositionNames, fingerPositionOrder, scanFingerprint, saveFingerprints } from '@/utils/fingerprint-utils';
+import { 
+  FingerPosition, 
+  FingerprintData, 
+  fingerPositionNames, 
+  fingerPositionOrder, 
+  scanFingerprint, 
+  saveFingerprints 
+} from '@/utils/fingerprint-utils';
+import FingerprintScanAnimation, { ScanStatus } from '@/components/auth/FingerprintScanAnimation';
 
 const FingerprintEnrollment: React.FC = () => {
   const navigate = useNavigate();
@@ -18,6 +27,8 @@ const FingerprintEnrollment: React.FC = () => {
   const [scanningFinger, setScanningFinger] = useState<FingerPosition | null>(null);
   const [progress, setProgress] = useState(0);
   const [enrollmentComplete, setEnrollmentComplete] = useState(false);
+  const [scanStatus, setScanStatus] = useState<ScanStatus>('idle');
+  const [lastScannedQuality, setLastScannedQuality] = useState<number | undefined>(undefined);
 
   const totalSteps = fingerPositionOrder.length;
 
@@ -37,27 +48,44 @@ const FingerprintEnrollment: React.FC = () => {
     const fingerPosition = fingerPositionOrder[currentStep];
     setIsScanning(true);
     setScanningFinger(fingerPosition);
+    setScanStatus('scanning');
 
     try {
-      // Simulate scanning process
+      // Simulate scanning process with improved animation timing
       toast.info(`Scanning ${fingerPositionNames[fingerPosition]}`);
+      
+      // Simulate a longer scan for better animation
+      await new Promise(resolve => setTimeout(resolve, 2000));
       
       // Call the scanning function
       const fingerprintData = await scanFingerprint(fingerPosition);
+      setLastScannedQuality(fingerprintData.quality);
       
       // Add to collected fingerprints
       setFingerprints(prev => [...prev, fingerprintData]);
       
-      // Show success message
+      // Show success feedback
+      setScanStatus('success');
       toast.success(`${fingerPositionNames[fingerPosition]} scanned successfully`);
       
-      // Move to next step
-      if (currentStep < totalSteps - 1) {
-        setCurrentStep(prev => prev + 1);
-      }
+      // Move to next step after showing success feedback
+      setTimeout(() => {
+        if (currentStep < totalSteps - 1) {
+          setCurrentStep(prev => prev + 1);
+          setScanStatus('idle');
+          setLastScannedQuality(undefined);
+        }
+      }, 1500);
+      
     } catch (error) {
+      setScanStatus('error');
       toast.error(`Failed to scan ${fingerPositionNames[fingerPosition]}`);
       console.error('Fingerprint scan error:', error);
+      
+      // Reset after error feedback
+      setTimeout(() => {
+        setScanStatus('idle');
+      }, 1500);
     } finally {
       setIsScanning(false);
       setScanningFinger(null);
@@ -91,7 +119,13 @@ const FingerprintEnrollment: React.FC = () => {
     setFingerprints([]);
     setEnrollmentComplete(false);
     setProgress(0);
+    setScanStatus('idle');
+    setLastScannedQuality(undefined);
   };
+
+  const currentFingerPosition = currentStep < totalSteps 
+    ? fingerPositionNames[fingerPositionOrder[currentStep]] 
+    : '';
 
   return (
     <div className="medimemo-container py-8">
@@ -130,26 +164,19 @@ const FingerprintEnrollment: React.FC = () => {
             <Progress value={progress} className="h-2" />
           </div>
           
-          {/* Current finger to scan */}
+          {/* Current finger to scan with enhanced animation */}
           {!enrollmentComplete ? (
             <div className="bg-blue-50 border border-blue-100 rounded-xl p-6 text-center">
-              <div className="w-20 h-20 bg-white rounded-full flex items-center justify-center mx-auto mb-4 shadow-sm">
-                <Fingerprint 
-                  className={`h-12 w-12 ${isScanning ? 'text-medimemo-primary animate-pulse' : 'text-gray-400'}`} 
-                />
-              </div>
-              <h3 className="text-lg font-bold text-gray-800">
-                {isScanning ? 'Scanning in progress...' : `Scan your ${fingerPositionNames[fingerPositionOrder[currentStep]]}`}
-              </h3>
-              <p className="text-sm text-gray-600 mt-2 max-w-md mx-auto">
-                {isScanning 
-                  ? 'Please keep your finger steady on the scanner' 
-                  : 'Place your finger on the scanner and press the scan button'}
-              </p>
+              <FingerprintScanAnimation 
+                status={scanStatus} 
+                fingerPosition={currentFingerPosition}
+                quality={lastScannedQuality}
+              />
+              
               <Button 
-                className="mt-6" 
+                className="mt-6 bg-gradient-to-r from-blue-500 to-indigo-600 hover:from-blue-600 hover:to-indigo-700"
                 onClick={handleFingerScan} 
-                disabled={isScanning || enrollmentComplete}
+                disabled={isScanning || scanStatus !== 'idle' || enrollmentComplete}
               >
                 {isScanning ? 'Scanning...' : 'Scan Fingerprint'}
               </Button>
@@ -170,7 +197,10 @@ const FingerprintEnrollment: React.FC = () => {
                   <ArrowLeft className="mr-2 h-4 w-4" />
                   Restart Enrollment
                 </Button>
-                <Button onClick={handleSave}>
+                <Button 
+                  onClick={handleSave}
+                  className="bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700"
+                >
                   Save Fingerprints
                   <ArrowRight className="ml-2 h-4 w-4" />
                 </Button>
@@ -192,11 +222,12 @@ const FingerprintEnrollment: React.FC = () => {
                   return (
                     <div 
                       key={position} 
-                      className={`flex items-center p-2 rounded ${
-                        isActive ? 'bg-blue-50 border border-blue-200' : 
-                        isEnrolled ? 'bg-green-50 border border-green-200' : 
-                        'bg-gray-50 border border-gray-200'
-                      }`}
+                      className={cn(
+                        "flex items-center p-2 rounded transition-all duration-300",
+                        isActive ? "bg-blue-50 border border-blue-200 shadow-sm" : 
+                        isEnrolled ? "bg-green-50 border border-green-200" : 
+                        "bg-gray-50 border border-gray-200"
+                      )}
                     >
                       {isEnrolled ? (
                         <div className="w-8 h-8 rounded-full bg-green-100 flex items-center justify-center">
@@ -204,14 +235,19 @@ const FingerprintEnrollment: React.FC = () => {
                         </div>
                       ) : (
                         <div className="w-8 h-8 rounded-full bg-gray-100 flex items-center justify-center">
-                          <Fingerprint className={`h-4 w-4 ${isActive ? 'text-blue-500' : 'text-gray-400'}`} />
+                          <Fingerprint className={cn(
+                            "h-4 w-4",
+                            isActive ? "text-blue-500" : "text-gray-400",
+                            isActive && scanStatus === 'scanning' && "animate-pulse"
+                          )} />
                         </div>
                       )}
-                      <span className={`ml-2 text-sm ${
-                        isActive ? 'font-medium text-blue-700' : 
-                        isEnrolled ? 'font-medium text-green-700' : 
-                        'text-gray-500'
-                      }`}>
+                      <span className={cn(
+                        "ml-2 text-sm",
+                        isActive ? "font-medium text-blue-700" : 
+                        isEnrolled ? "font-medium text-green-700" : 
+                        "text-gray-500"
+                      )}>
                         {fingerPositionNames[position]}
                       </span>
                     </div>
@@ -244,7 +280,10 @@ const FingerprintEnrollment: React.FC = () => {
             Cancel
           </Button>
           {enrollmentComplete && (
-            <Button onClick={handleSave}>
+            <Button 
+              onClick={handleSave}
+              className="bg-gradient-to-r from-blue-500 to-indigo-600 hover:from-blue-600 hover:to-indigo-700"
+            >
               Save and Complete
             </Button>
           )}
