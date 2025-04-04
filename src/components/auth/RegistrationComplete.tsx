@@ -2,20 +2,25 @@
 import React from 'react';
 import { Check, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { formatFingerprintList } from '@/utils/fingerprint-scan-utils';
+import { FingerprintData } from '@/utils/fingerprint-utils';
 
 interface RegistrationCompleteProps {
-  fingerprintsCount: number;
+  fingerprints: FingerprintData[];
   onComplete: () => void;
   onBack: () => void;
   isLoading: boolean;
 }
 
 const RegistrationComplete: React.FC<RegistrationCompleteProps> = ({ 
-  fingerprintsCount, 
+  fingerprints, 
   onComplete, 
   onBack,
   isLoading
 }) => {
+  const fingerprintsCount = fingerprints.length;
+  const fingerprintsSummary = formatFingerprintList(fingerprints);
+  
   return (
     <div className="space-y-6 text-center">
       <div>
@@ -28,6 +33,11 @@ const RegistrationComplete: React.FC<RegistrationCompleteProps> = ({
             ? `You've successfully enrolled ${fingerprintsCount} fingerprints.` 
             : "You've skipped fingerprint enrollment."}
         </p>
+        {fingerprintsCount > 0 && (
+          <p className="text-xs text-muted-foreground mt-1">
+            {fingerprintsSummary}
+          </p>
+        )}
       </div>
       
       <div className="bg-blue-50 p-4 rounded-md text-sm text-blue-700">
