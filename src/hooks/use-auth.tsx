@@ -142,7 +142,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
               address: userData.address,
               emergency_contact_name: userData.emergencyContactName,
               emergency_contact_relation: userData.emergencyContactRelation,
-              emergency_contact_number: userData.emergencyContactNumber
+              emergency_contact_number: userData.emergencyContactNumber,
+              has_fingerprints: userData.hasFingerprints || false
             })
             .eq('id', data.user.id);
             
