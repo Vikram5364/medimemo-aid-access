@@ -76,6 +76,7 @@ const RegisterForm = () => {
   const [scanningFinger, setScanningFinger] = useState<FingerPosition | null>(null);
   const [fingerprintProgress, setFingerprintProgress] = useState(0);
   const [formData, setFormData] = useState<RegisterFormValues | null>(null);
+  const [hasFingerprints, setHasFingerprints] = useState(false);
   
   const navigate = useNavigate();
   const { register, isLoading } = useAuth();
@@ -129,18 +130,42 @@ const RegisterForm = () => {
         emergencyContactName: formData.emergencyContactName,
         emergencyContactRelation: formData.emergencyContactRelation,
         emergencyContactNumber: formData.emergencyContactNumber,
+        hasFingerprints: fingerprints.length > 0
       });
       
       if (success) {
         // Save fingerprints using the email as identifier
-        saveFingerprints(formData.email, fingerprints);
+        if (fingerprints.length > 0) {
+          saveFingerprints(formData.email, fingerprints);
+          setHasFingerprints(true);
+        }
         
         // Navigate to login page
+        toast.success('Registration successful! Please log in to continue.');
         navigate('/login');
       }
     } catch (error: any) {
       console.error('Registration error:', error);
       toast.error(error.message || 'An error occurred during registration');
+    }
+  };
+
+  // Auto scan the next fingerprint after a successful scan
+  const scanNextFingerprint = async () => {
+    if (currentFingerStep >= totalFingerSteps) {
+      return;
+    }
+    
+    await handleFingerScan();
+    
+    // If we have more fingerprints to scan and the last scan was successful,
+    // automatically start the next scan after a short delay
+    if (fingerprints.length > 0 && currentFingerStep < totalFingerSteps) {
+      setTimeout(() => {
+        if (currentFingerStep < totalFingerSteps) {
+          scanNextFingerprint();
+        }
+      }, 500);
     }
   };
 
@@ -192,6 +217,12 @@ const RegisterForm = () => {
     setFingerprints([]);
     setCurrentFingerStep(0);
     setFingerprintProgress(0);
+  };
+
+  // Start auto-scanning all fingerprints
+  const startAutoScan = () => {
+    resetFingerprints();
+    scanNextFingerprint();
   };
 
   const togglePasswordVisibility = () => {
@@ -701,7 +732,7 @@ const RegisterForm = () => {
             <div>
               <h3 className="text-lg font-medium">Fingerprint Enrollment</h3>
               <p className="text-sm text-muted-foreground mt-1">
-                Register your fingerprints for faster authentication in the future
+                Register your fingerprints for faster and more secure authentication
               </p>
             </div>
             
@@ -711,7 +742,7 @@ const RegisterForm = () => {
                 <span>Progress</span>
                 <span>{fingerprints.length} of {totalFingerSteps} fingerprints</span>
               </div>
-              <Progress value={fingerprintProgress} className="h-2" />
+              <Progress value={(fingerprints.length / totalFingerSteps) * 100} className="h-2" />
             </div>
             
             {/* Current finger to scan */}
@@ -726,7 +757,7 @@ const RegisterForm = () => {
                   'Scanning in progress...' : 
                   fingerprints.length >= totalFingerSteps ? 
                     'All fingerprints collected!' : 
-                    `Scan your ${fingerPositionNames[fingerPositionOrder[currentFingerStep]]}`
+                    `Ready to scan your ${fingerPositionNames[fingerPositionOrder[currentFingerStep]]}`
                 }
               </h3>
               <p className="text-sm text-gray-600 mt-2 max-w-md mx-auto">
@@ -734,7 +765,7 @@ const RegisterForm = () => {
                   ? 'Please keep your finger steady on the scanner' 
                   : fingerprints.length >= totalFingerSteps
                     ? 'You can now complete your registration'
-                    : 'Place your finger on the scanner and press the scan button'
+                    : 'Click start scanning to begin the fingerprint collection process'
                 }
               </p>
               
@@ -753,12 +784,21 @@ const RegisterForm = () => {
                   <Button variant="outline" onClick={skipFingerprints}>
                     Skip for Now
                   </Button>
-                  <Button
-                    onClick={handleFingerScan}
-                    disabled={isScanning}
-                  >
-                    {isScanning ? 'Scanning...' : 'Scan Fingerprint'}
-                  </Button>
+                  {fingerprints.length === 0 ? (
+                    <Button
+                      onClick={startAutoScan}
+                      disabled={isScanning}
+                    >
+                      {isScanning ? 'Scanning...' : 'Start Scanning All Fingerprints'}
+                    </Button>
+                  ) : (
+                    <Button
+                      onClick={handleFingerScan}
+                      disabled={isScanning}
+                    >
+                      {isScanning ? 'Scanning...' : 'Scan Next Fingerprint'}
+                    </Button>
+                  )}
                 </div>
               )}
             </div>

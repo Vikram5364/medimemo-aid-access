@@ -61,7 +61,7 @@ export const fingerPositionOrder: FingerPosition[] = [
  */
 export const scanFingerprint = async (position: FingerPosition): Promise<FingerprintData> => {
   // Simulate scanning delay
-  await new Promise(resolve => setTimeout(resolve, 1500));
+  await new Promise(resolve => setTimeout(resolve, 1000));
   
   // Generate a random template (in real app, this would be from the scanner)
   const template = btoa(`fingerprint_template_${position}_${Date.now()}`);
@@ -117,7 +117,7 @@ export const getFingerprints = (): FingerprintsCollection | null => {
  */
 export const verifyFingerprint = async (scannedFingerprint: FingerprintData): Promise<boolean> => {
   // Simulate verification delay
-  await new Promise(resolve => setTimeout(resolve, 1000));
+  await new Promise(resolve => setTimeout(resolve, 700));
   
   // Get stored fingerprints
   const storedData = getFingerprints();
