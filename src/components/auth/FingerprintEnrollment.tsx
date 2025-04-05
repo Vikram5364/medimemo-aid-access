@@ -151,6 +151,7 @@ const FingerprintEnrollment: React.FC<FingerprintEnrollmentProps> = ({ onComplet
           status={scanStatus} 
           fingerPosition={currentFingerPosition}
           quality={lastScannedQuality}
+          onScan={status === 'idle' ? handleFingerScan : undefined}
         />
         
         {fingerprints.length >= totalFingerSteps ? (

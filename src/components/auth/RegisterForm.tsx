@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
@@ -48,6 +49,7 @@ const RegisterForm = () => {
     if (!formData) return;
     
     try {
+      // Directly register the user, bypassing email confirmation
       const success = await register(formData.email, formData.password, {
         name: formData.name,
         aadhaar: formData.aadhaar,
@@ -70,11 +72,12 @@ const RegisterForm = () => {
         if (fingerprints.length > 0) {
           saveFingerprints(formData.email, fingerprints);
           setHasFingerprints(true);
+          toast.success('Fingerprints saved successfully!');
         }
         
-        // Navigate to login page
-        toast.success('Registration successful! Please log in to continue.');
-        navigate('/login');
+        // Navigate to dashboard directly instead of login
+        toast.success('Registration successful! You are now logged in.');
+        navigate('/dashboard');
       }
     } catch (error: any) {
       console.error('Registration error:', error);

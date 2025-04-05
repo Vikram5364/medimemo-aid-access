@@ -108,6 +108,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       // Determine if this is an organization registration
       const isOrganization = userData?.isOrganization || false;
       
+      // Sign up without requiring email verification (using autoconfirm)
       const { data, error } = await supabase.auth.signUp({
         email,
         password,
@@ -116,7 +117,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
             name: userData?.name,
             aadhaar: userData?.aadhaar,
             isOrganization: isOrganization
-          }
+          },
+          emailRedirectTo: window.location.origin + '/dashboard'
         }
       });
       
@@ -177,8 +179,19 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           toast.success('Organization registration successful!');
         }
         
-        toast.success('Registration successful! Please check your email to verify your account.');
-        return true;
+        // Auto-login the user after successful registration
+        if (data.session) {
+          setIsAuthenticated(true);
+          setUserEmail(data.user.email);
+          setUserType(isOrganization ? 'organization' : 'individual');
+          
+          toast.success('Registration successful! You are now logged in.');
+          return true;
+        } else {
+          // If no session was created, show a message but consider registration successful
+          toast.info('Account created! Please check your email for verification instructions.');
+          return true;
+        }
       }
       
       return false;

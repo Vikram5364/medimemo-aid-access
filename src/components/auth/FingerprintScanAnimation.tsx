@@ -9,14 +9,17 @@ interface FingerprintScanAnimationProps {
   status: ScanStatus;
   fingerPosition?: string;
   quality?: number;
+  onScan?: () => void;
 }
 
 const FingerprintScanAnimation: React.FC<FingerprintScanAnimationProps> = ({
   status,
   fingerPosition,
-  quality = 0
+  quality = 0,
+  onScan
 }) => {
   const [ripples, setRipples] = useState<number[]>([]);
+  const [isPressed, setIsPressed] = useState(false);
   
   // Add ripple effect during scanning
   useEffect(() => {
@@ -35,17 +38,42 @@ const FingerprintScanAnimation: React.FC<FingerprintScanAnimationProps> = ({
     }
   }, [status]);
 
+  // Handle press simulation
+  const handleMouseDown = () => {
+    if (status === 'idle' && onScan) {
+      setIsPressed(true);
+      onScan();
+    }
+  };
+
+  const handleMouseUp = () => {
+    setIsPressed(false);
+  };
+
   return (
     <div className="relative flex flex-col items-center justify-center py-8">
+      {/* Interactive instructions when idle */}
+      {status === 'idle' && onScan && (
+        <p className="text-sm text-blue-600 animate-pulse mb-2">
+          Press and hold to scan
+        </p>
+      )}
+      
       {/* Fingerprint container with pulsing effect */}
       <div 
         className={cn(
           "relative w-28 h-28 rounded-full flex items-center justify-center mb-4 transition-all duration-500",
-          status === 'idle' && "bg-gray-100",
+          status === 'idle' && "bg-gray-100 cursor-pointer hover:bg-gray-200",
           status === 'scanning' && "bg-blue-50",
           status === 'success' && "bg-green-50",
-          status === 'error' && "bg-red-50"
+          status === 'error' && "bg-red-50",
+          isPressed && "scale-95"
         )}
+        onMouseDown={handleMouseDown}
+        onMouseUp={handleMouseUp}
+        onMouseLeave={handleMouseUp}
+        onTouchStart={handleMouseDown}
+        onTouchEnd={handleMouseUp}
       >
         {/* Ripple effects */}
         {ripples.map((id) => (

@@ -72,6 +72,57 @@ export type Database = {
         }
         Relationships: []
       }
+      problems: {
+        Row: {
+          category: string[]
+          description: string
+          difficulty: string
+          id: number
+          link: string | null
+          title: string
+        }
+        Insert: {
+          category: string[]
+          description: string
+          difficulty: string
+          id: number
+          link?: string | null
+          title: string
+        }
+        Update: {
+          category?: string[]
+          description?: string
+          difficulty?: string
+          id?: number
+          link?: string | null
+          title?: string
+        }
+        Relationships: []
+      }
+      problems_solved: {
+        Row: {
+          completed_at: string
+          id: string
+          problem_id: number
+          solution: string | null
+          user_id: string
+        }
+        Insert: {
+          completed_at?: string
+          id?: string
+          problem_id: number
+          solution?: string | null
+          user_id: string
+        }
+        Update: {
+          completed_at?: string
+          id?: string
+          problem_id?: number
+          solution?: string | null
+          user_id?: string
+        }
+        Relationships: []
+      }
       profiles: {
         Row: {
           aadhaar: string | null
@@ -126,6 +177,39 @@ export type Database = {
           name?: string | null
           updated_at?: string
           weight?: number | null
+        }
+        Relationships: []
+      }
+      user_statistics: {
+        Row: {
+          easy_solved: number
+          hard_solved: number
+          id: string
+          last_active_date: string
+          medium_solved: number
+          problems_solved: number
+          streak_days: number
+          user_id: string
+        }
+        Insert: {
+          easy_solved?: number
+          hard_solved?: number
+          id?: string
+          last_active_date?: string
+          medium_solved?: number
+          problems_solved?: number
+          streak_days?: number
+          user_id: string
+        }
+        Update: {
+          easy_solved?: number
+          hard_solved?: number
+          id?: string
+          last_active_date?: string
+          medium_solved?: number
+          problems_solved?: number
+          streak_days?: number
+          user_id?: string
         }
         Relationships: []
       }
