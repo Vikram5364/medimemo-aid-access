@@ -182,7 +182,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         } 
         // For organization users, create an organization record
         else if (isOrganization && userData) {
-          // You might want to create an 'organizations' table in Supabase for this
           // This is a simplified version that uses user_metadata for now
           toast.success('Organization registration successful!');
         }
@@ -194,10 +193,20 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           setUserEmail(data.user.email);
           setUserType(isOrganization ? 'organization' : 'individual');
           
+          // Store important user data in localStorage for persistence
+          localStorage.setItem('userEmail', data.user.email || '');
+          if (userData?.aadhaar) {
+            localStorage.setItem('userAadhaar', userData.aadhaar);
+            setUserAadhaar(userData.aadhaar);
+          }
+          
+          // Store user information for dashboard access
+          localStorage.setItem('userData', JSON.stringify(userData || {}));
+          
           toast.success('Registration successful! You are now logged in.');
           return true;
         } else {
-          // If no session was created (shouldn't happen with autoconfirm), try to sign in manually
+          // If no session was created, try to sign in manually
           console.log('No session created, attempting manual signin');
           const { data: signInData, error: signInError } = await supabase.auth.signInWithPassword({
             email,
@@ -214,6 +223,16 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
             setIsAuthenticated(true);
             setUserEmail(data.user.email);
             setUserType(isOrganization ? 'organization' : 'individual');
+            
+            // Store user information in localStorage
+            localStorage.setItem('userEmail', data.user.email || '');
+            if (userData?.aadhaar) {
+              localStorage.setItem('userAadhaar', userData.aadhaar);
+              setUserAadhaar(userData.aadhaar);
+            }
+            localStorage.setItem('userData', JSON.stringify(userData || {}));
+            localStorage.setItem('userType', isOrganization ? 'organization' : 'individual');
+            
             toast.success('Registration and login successful!');
             return true;
           }

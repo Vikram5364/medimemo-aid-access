@@ -77,7 +77,11 @@ const RegisterForm = () => {
         
         // Navigate to dashboard directly instead of login
         toast.success('Registration successful! You are now logged in.');
-        navigate('/dashboard');
+        
+        // Ensure we're redirecting to dashboard with a slight delay to allow state updates
+        setTimeout(() => {
+          navigate('/dashboard');
+        }, 500);
       }
     } catch (error: any) {
       console.error('Registration error:', error);
