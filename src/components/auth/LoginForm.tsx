@@ -39,6 +39,9 @@ const LoginForm: React.FC = () => {
     
     if (loginMethod === 'email') {
       try {
+        // Log the login attempt for debugging
+        console.log('Attempting login with:', { email, password });
+        
         const success = await login('email', { 
           email, 
           password 
@@ -47,8 +50,12 @@ const LoginForm: React.FC = () => {
         if (success) {
           toast.success('Login successful');
           navigate('/dashboard');
+        } else {
+          // This helps identify if login returned false but didn't throw an error
+          console.log('Login returned false without error');
+          toast.error('Invalid email or password');
         }
-      } catch (error) {
+      } catch (error: any) {
         console.error('Login error:', error);
         toast.error('Login failed. Please check your credentials and try again.');
       }
@@ -58,6 +65,8 @@ const LoginForm: React.FC = () => {
         try {
           // Format Aadhaar by removing spaces
           const formattedAadhaar = aadhaar.replace(/\s/g, '');
+          
+          console.log('Verifying OTP for Aadhaar:', { aadhaar: formattedAadhaar, otp });
           
           const success = await login('aadhaar', { 
             aadhaar: formattedAadhaar,
@@ -99,6 +108,8 @@ const LoginForm: React.FC = () => {
     e.preventDefault();
     
     try {
+      console.log('Attempting organization login with:', { orgId, password: '******' });
+      
       const success = await login('organization', {
         orgId,
         password: orgPassword
@@ -107,8 +118,10 @@ const LoginForm: React.FC = () => {
       if (success) {
         toast.success('Organization login successful');
         navigate('/dashboard');
+      } else {
+        toast.error('Invalid credentials. Please check your Organization ID and password.');
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error('Organization login error:', error);
       toast.error('Login failed. Please check your credentials and try again.');
     }

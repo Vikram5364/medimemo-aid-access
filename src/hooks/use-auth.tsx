@@ -1,3 +1,4 @@
+
 import { useState, useEffect, createContext, useContext, ReactNode } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
@@ -13,6 +14,8 @@ interface AuthContextType {
   register: (email: string, password: string, userData?: any) => Promise<boolean>;
   logout: () => void;
   isLoading: boolean;
+  resetPassword: (email: string) => Promise<boolean>;
+  updatePassword: (newPassword: string) => Promise<boolean>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -44,14 +47,21 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
             setUserType('individual');
             
             // Retrieve Aadhaar if available for individuals
-            const { data: profileData } = await supabase
-              .from('profiles')
-              .select('aadhaar')
-              .eq('id', session.user.id)
-              .single();
-              
-            if (profileData && profileData.aadhaar) {
-              setUserAadhaar(profileData.aadhaar);
+            try {
+              const { data: profileData, error } = await supabase
+                .from('profiles')
+                .select('aadhaar')
+                .eq('id', session.user.id)
+                .maybeSingle();
+                
+              if (profileData && profileData.aadhaar) {
+                setUserAadhaar(profileData.aadhaar);
+              }
+              if (error) {
+                console.error('Error fetching profile:', error);
+              }
+            } catch (err) {
+              console.error('Profile fetch error:', err);
             }
           }
         } else {
@@ -70,10 +80,11 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (event, session) => {
         console.log('Auth state changed:', event, session);
-        setIsAuthenticated(!!session);
-        setUserEmail(session?.user?.email || null);
         
         if (session) {
+          setIsAuthenticated(true);
+          setUserEmail(session.user.email);
+          
           // Check if user is an organization by looking at metadata
           if (session.user.user_metadata?.isOrganization) {
             setUserType('organization');
@@ -82,19 +93,28 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
             setUserType('individual');
             
             // Try to get Aadhaar from profile for individuals
-            const { data: profileData } = await supabase
-              .from('profiles')
-              .select('aadhaar')
-              .eq('id', session.user.id)
-              .single();
-              
-            if (profileData && profileData.aadhaar) {
-              setUserAadhaar(profileData.aadhaar);
+            try {
+              const { data: profileData, error } = await supabase
+                .from('profiles')
+                .select('aadhaar')
+                .eq('id', session.user.id)
+                .maybeSingle();
+                
+              if (profileData && profileData.aadhaar) {
+                setUserAadhaar(profileData.aadhaar);
+              }
+              if (error) {
+                console.error('Error fetching profile:', error);
+              }
+            } catch (err) {
+              console.error('Profile fetch error:', err);
             }
           }
         } else {
+          setIsAuthenticated(false);
           setUserType(null);
           setUserAadhaar(null);
+          setUserEmail(null);
         }
       }
     );
@@ -264,6 +284,10 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         // Email-based login for individuals
         if (credentials.email && credentials.password) {
           console.log('Attempting email login with:', { email: credentials.email });
+          
+          // Clear any existing session first to ensure a fresh login attempt
+          await supabase.auth.signOut();
+          
           const { data, error } = await supabase.auth.signInWithPassword({
             email: credentials.email,
             password: credentials.password
@@ -271,7 +295,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           
           if (error) {
             console.error('Email login error:', error);
-            toast.error(error.message);
+            toast.error('Invalid email or password');
             return false;
           }
           
@@ -282,6 +306,11 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
               setIsAuthenticated(true);
               setUserType('individual');
               setUserEmail(data.user.email);
+              
+              // Store important user data in localStorage for persistence
+              localStorage.setItem('userEmail', data.user.email || '');
+              localStorage.setItem('userType', 'individual');
+              
               toast.success('Login successful');
               return true;
             } else {
@@ -290,8 +319,11 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
               return false;
             }
           }
+          
+          toast.error('Login failed. User not found.');
+          return false;
         } else {
-          toast.error('Invalid email or password');
+          toast.error('Please enter both email and password');
           return false;
         }
       } else if (type === 'aadhaar') {
@@ -306,7 +338,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           .from('profiles')
           .select('id, email, aadhaar')
           .eq('aadhaar', credentials.aadhaar)
-          .single();
+          .maybeSingle();
           
         if (data && data.email) {
           // For demo purposes, simulate OTP verification
@@ -321,19 +353,15 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
             if (data.email) {
               setUserEmail(data.email);
               
+              // Store in localStorage
+              localStorage.setItem('userEmail', data.email || '');
+              localStorage.setItem('userAadhaar', credentials.aadhaar);
+              localStorage.setItem('userType', 'individual');
+              
               // Try to sign in as the user to get an actual session
-              // This is just for the demo; in a real app, you'd use a proper token
-              // This is just a simulation - not secure for production!
-              const profiles = await supabase
-                .from('profiles')
-                .select('email')
-                .eq('aadhaar', credentials.aadhaar);
-                
-              if (profiles.data && profiles.data.length > 0) {
-                // We have the email, but we don't have the password
-                // In a real app, you'd use a proper token-based approach
-                console.log('Found matching profile with email:', profiles.data[0].email);
-              }
+              // Simplified authentication for demo purposes
+              toast.success('Successfully logged in with Aadhaar');
+              return true;
             }
             
             return true;
@@ -363,13 +391,18 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           .from('profiles')
           .select('email, aadhaar')
           .limit(1)
-          .single();
+          .maybeSingle();
           
         if (data) {
           setUserEmail(data.email);
           if (data.aadhaar) {
             setUserAadhaar(data.aadhaar);
+            // Store in localStorage
+            localStorage.setItem('userAadhaar', data.aadhaar);
           }
+          // Store in localStorage
+          localStorage.setItem('userEmail', data.email || '');
+          localStorage.setItem('userType', 'individual');
         }
         
         return true;
@@ -387,7 +420,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           
           if (error) {
             console.error('Organization login error:', error);
-            toast.error(error.message);
+            toast.error('Invalid organization ID or password');
             return false;
           }
           
@@ -398,6 +431,11 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
               setIsAuthenticated(true);
               setUserType('organization');
               setUserEmail(data.user.email);
+              
+              // Store in localStorage
+              localStorage.setItem('userEmail', data.user.email || '');
+              localStorage.setItem('userType', 'organization');
+              
               toast.success('Organization login successful');
               return true;
             } else {
@@ -406,8 +444,11 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
               return false;
             }
           }
+          
+          toast.error('Organization not found');
+          return false;
         } else {
-          toast.error('Invalid organization credentials');
+          toast.error('Please enter both organization ID and password');
           return false;
         }
       } else {
@@ -439,6 +480,12 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       setUserEmail(null);
       setUserAadhaar(null);
       
+      // Clear localStorage items
+      localStorage.removeItem('userEmail');
+      localStorage.removeItem('userAadhaar');
+      localStorage.removeItem('userData');
+      localStorage.removeItem('userType');
+      
       toast.success('Logged out successfully');
       navigate('/');
     } catch (error: any) {
@@ -446,6 +493,43 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       toast.error(error.message || 'An error occurred during logout');
     }
   };
+
+  const resetPassword = async (email: string): Promise<boolean> => {
+    try {
+      const { error } = await supabase.auth.resetPasswordForEmail(email, {
+        redirectTo: window.location.origin + '/reset-password',
+      });
+      
+      if (error) {
+        console.error('Reset password error:', error);
+        throw error;
+      }
+      
+      return true;
+    } catch (error: any) {
+      console.error('Reset password error:', error);
+      throw error;
+    }
+  };
+  
+  const updatePassword = async (newPassword: string): Promise<boolean> => {
+    try {
+      const { error } = await supabase.auth.updateUser({
+        password: newPassword
+      });
+      
+      if (error) {
+        console.error('Update password error:', error);
+        throw error;
+      }
+      
+      return true;
+    } catch (error: any) {
+      console.error('Update password error:', error);
+      throw error;
+    }
+  };
+
   // Return the auth context provider
   return (
     <AuthContext.Provider
@@ -457,7 +541,9 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         login,
         register,
         logout,
-        isLoading
+        isLoading,
+        resetPassword,
+        updatePassword
       }}
     >
       {children}
