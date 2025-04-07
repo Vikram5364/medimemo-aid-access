@@ -130,7 +130,12 @@ export const registerUser = async (email: string, password: string, userData?: U
 /**
  * Handle email-based login
  */
-const handleEmailLogin = async (credentials: UserCredentials) => {
+const handleEmailLogin = async (credentials: UserCredentials): Promise<{ 
+  success: boolean; 
+  userType?: UserType; 
+  userEmail?: string | null;
+  userAadhaar?: string | null;
+}> => {
   if (!credentials.email || !credentials.password) {
     toast.error('Please enter both email and password');
     return { success: false };
@@ -176,7 +181,12 @@ const handleEmailLogin = async (credentials: UserCredentials) => {
 /**
  * Handle Aadhaar-based login
  */
-const handleAadhaarLogin = async (credentials: UserCredentials) => {
+const handleAadhaarLogin = async (credentials: UserCredentials): Promise<{ 
+  success: boolean; 
+  userType?: UserType; 
+  userEmail?: string | null;
+  userAadhaar?: string | null;
+}> => {
   console.log('Attempting Aadhaar login with:', { aadhaar: credentials.aadhaar });
   
   // In this demo version, we'll approve login if:
@@ -218,7 +228,12 @@ const handleAadhaarLogin = async (credentials: UserCredentials) => {
 /**
  * Handle biometric login
  */
-const handleBiometricLogin = async () => {
+const handleBiometricLogin = async (): Promise<{ 
+  success: boolean; 
+  userType?: UserType; 
+  userEmail?: string | null;
+  userAadhaar?: string | null;
+}> => {
   // Simulate successful biometric login for demo
   console.log('Simulating successful biometric login');
   
@@ -244,7 +259,12 @@ const handleBiometricLogin = async () => {
 /**
  * Handle organization login
  */
-const handleOrganizationLogin = async (credentials: UserCredentials) => {
+const handleOrganizationLogin = async (credentials: UserCredentials): Promise<{ 
+  success: boolean; 
+  userType?: UserType; 
+  userEmail?: string | null;
+  userAadhaar?: string | null;
+}> => {
   if (!credentials.orgId || !credentials.password) {
     toast.error('Please enter both organization ID and password');
     return { success: false };
