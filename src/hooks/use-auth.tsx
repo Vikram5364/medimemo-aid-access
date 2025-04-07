@@ -29,6 +29,40 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
   // Check for existing authentication on mount
   useEffect(() => {
+    // First set up auth state listener to prevent race conditions
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(
+      async (event, session) => {
+        console.log('Auth state changed:', event, session);
+        
+        if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') {
+          if (session) {
+            setIsAuthenticated(true);
+            setUserEmail(session.user.email);
+            
+            // Check if user is an organization by looking at metadata
+            if (session.user.user_metadata?.isOrganization === true) {
+              setUserType('organization');
+              setUserAadhaar(null); // Organizations don't have Aadhaar
+            } else {
+              setUserType('individual');
+              
+              // Try to get Aadhaar from profile for individuals
+              const profileData = await fetchUserProfile(session.user.id);
+              if (profileData && profileData.aadhaar) {
+                setUserAadhaar(profileData.aadhaar);
+              }
+            }
+          }
+        } else if (event === 'SIGNED_OUT') {
+          setIsAuthenticated(false);
+          setUserType(null);
+          setUserAadhaar(null);
+          setUserEmail(null);
+        }
+      }
+    );
+    
+    // Then check for existing session
     const checkSession = async () => {
       try {
         const { data } = await supabase.auth.getSession();
@@ -40,7 +74,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           setUserEmail(session.user.email);
           
           // Check if user is an organization by looking at metadata
-          if (session.user.user_metadata?.isOrganization) {
+          if (session.user.user_metadata?.isOrganization === true) {
             setUserType('organization');
           } else {
             setUserType('individual');
@@ -62,37 +96,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     };
     
     checkSession();
-    
-    // Set up auth state listener
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      async (event, session) => {
-        console.log('Auth state changed:', event, session);
-        
-        if (session) {
-          setIsAuthenticated(true);
-          setUserEmail(session.user.email);
-          
-          // Check if user is an organization by looking at metadata
-          if (session.user.user_metadata?.isOrganization) {
-            setUserType('organization');
-            setUserAadhaar(null); // Organizations don't have Aadhaar
-          } else {
-            setUserType('individual');
-            
-            // Try to get Aadhaar from profile for individuals
-            const profileData = await fetchUserProfile(session.user.id);
-            if (profileData && profileData.aadhaar) {
-              setUserAadhaar(profileData.aadhaar);
-            }
-          }
-        } else {
-          setIsAuthenticated(false);
-          setUserType(null);
-          setUserAadhaar(null);
-          setUserEmail(null);
-        }
-      }
-    );
     
     return () => {
       subscription.unsubscribe();
@@ -160,6 +163,9 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           
           // Store user data in localStorage
           storeUserData(result.userType, result.userEmail, result.userAadhaar);
+          
+          // Navigate to dashboard after successful login
+          navigate('/dashboard');
         }
         
         return true;
@@ -173,6 +179,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
   const logout = async () => {
     try {
+      setIsLoading(true);
       const success = await logoutUser();
       
       if (success) {
@@ -191,6 +198,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     } catch (error: any) {
       console.error('Logout error:', error);
       toast.error(error.message || 'An error occurred during logout');
+    } finally {
+      setIsLoading(false);
     }
   };
 

@@ -16,11 +16,13 @@ const EmailLoginForm: React.FC<EmailLoginFormProps> = ({ isLoading }) => {
   const { login } = useAuth();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [localLoading, setLocalLoading] = useState(false);
 
   const handleEmailLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     
     try {
+      setLocalLoading(true);
       console.log('Attempting email login with:', { email });
       
       const success = await login('email', { 
@@ -28,14 +30,14 @@ const EmailLoginForm: React.FC<EmailLoginFormProps> = ({ isLoading }) => {
         password 
       });
       
-      if (success) {
-        toast.success('Login successful');
-      } else {
+      if (!success) {
         toast.error('Invalid email or password');
       }
     } catch (error: any) {
       console.error('Email login error:', error);
       toast.error('Login failed. Please check your credentials and try again.');
+    } finally {
+      setLocalLoading(false);
     }
   };
 
@@ -79,8 +81,8 @@ const EmailLoginForm: React.FC<EmailLoginFormProps> = ({ isLoading }) => {
           </div>
         </div>
         
-        <Button type="submit" className="w-full" disabled={isLoading}>
-          {isLoading ? "Logging in..." : "Log in"}
+        <Button type="submit" className="w-full" disabled={isLoading || localLoading}>
+          {isLoading || localLoading ? "Logging in..." : "Log in"}
         </Button>
       </div>
     </form>

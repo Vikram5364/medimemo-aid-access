@@ -159,8 +159,11 @@ const handleEmailLogin = async (credentials: UserCredentials): Promise<{
   
   if (data.user) {
     console.log('Email login success:', data.user);
+    console.log('User metadata:', data.user.user_metadata);
     // Check if this is an individual user (not an organization)
-    if (!data.user.user_metadata?.isOrganization) {
+    const isOrganization = data.user.user_metadata?.isOrganization === true;
+    
+    if (!isOrganization) {
       toast.success('Login successful');
       return { 
         success: true,
@@ -287,8 +290,11 @@ const handleOrganizationLogin = async (credentials: UserCredentials): Promise<{
   
   if (data.user) {
     console.log('Organization login success:', data.user);
+    console.log('User metadata:', data.user.user_metadata);
     // Check if this is indeed an organization account
-    if (data.user.user_metadata?.isOrganization) {
+    const isOrganization = data.user.user_metadata?.isOrganization === true;
+    
+    if (isOrganization) {
       toast.success('Organization login successful');
       return { 
         success: true,
