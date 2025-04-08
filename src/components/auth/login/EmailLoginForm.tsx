@@ -21,6 +21,11 @@ const EmailLoginForm: React.FC<EmailLoginFormProps> = ({ isLoading }) => {
   const handleEmailLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     
+    if (!email || !password) {
+      toast.error('Please enter both email and password');
+      return;
+    }
+    
     try {
       setLocalLoading(true);
       console.log('Attempting email login with:', { email });
@@ -31,6 +36,7 @@ const EmailLoginForm: React.FC<EmailLoginFormProps> = ({ isLoading }) => {
       });
       
       if (!success) {
+        console.error('Login failed in component');
         toast.error('Invalid email or password');
       }
     } catch (error: any) {

@@ -145,9 +145,12 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     setIsLoading(true);
     
     try {
+      console.log('Login called with type:', type, 'and credentials:', credentials);
       const result = await loginUser(type, credentials);
       
       if (result.success) {
+        console.log('Login succeeded, result:', result);
+        
         // Update auth state
         if (result.userType) {
           setIsAuthenticated(true);
@@ -165,12 +168,17 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           storeUserData(result.userType, result.userEmail, result.userAadhaar);
           
           // Navigate to dashboard after successful login
+          toast.success('Login successful! Redirecting to dashboard...');
           navigate('/dashboard');
         }
         
         return true;
+      } else {
+        console.log('Login failed, result:', result);
+        return false;
       }
-      
+    } catch (error) {
+      console.error('Login error in use-auth:', error);
       return false;
     } finally {
       setIsLoading(false);

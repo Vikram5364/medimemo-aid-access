@@ -143,42 +143,48 @@ const handleEmailLogin = async (credentials: UserCredentials): Promise<{
   
   console.log('Attempting email login with:', { email: credentials.email });
   
-  // Clear any existing session first to ensure a fresh login attempt
-  await supabase.auth.signOut();
-  
-  const { data, error } = await supabase.auth.signInWithPassword({
-    email: credentials.email,
-    password: credentials.password
-  });
-  
-  if (error) {
-    console.error('Email login error:', error);
-    toast.error('Invalid email or password');
-    return { success: false };
-  }
-  
-  if (data.user) {
-    console.log('Email login success:', data.user);
-    console.log('User metadata:', data.user.user_metadata);
-    // Check if this is an individual user (not an organization)
-    const isOrganization = data.user.user_metadata?.isOrganization === true;
+  try {
+    // Clear any existing session first to ensure a fresh login attempt
+    await supabase.auth.signOut();
     
-    if (!isOrganization) {
-      toast.success('Login successful');
-      return { 
-        success: true,
-        userType: 'individual',
-        userEmail: data.user.email
-      };
-    } else {
-      toast.error('This account is registered as an organization. Please use organization login.');
-      await supabase.auth.signOut();
+    const { data, error } = await supabase.auth.signInWithPassword({
+      email: credentials.email,
+      password: credentials.password
+    });
+    
+    if (error) {
+      console.error('Email login error:', error);
+      toast.error('Invalid email or password');
       return { success: false };
     }
+    
+    if (data.user) {
+      console.log('Email login success:', data.user);
+      console.log('User metadata:', data.user.user_metadata);
+      
+      // Check if this is an individual user (not an organization)
+      const isOrganization = data.user.user_metadata?.isOrganization === true;
+      
+      if (!isOrganization) {
+        toast.success('Login successful');
+        return { 
+          success: true,
+          userType: 'individual' as UserType,
+          userEmail: data.user.email
+        };
+      } else {
+        toast.error('This account is registered as an organization. Please use organization login.');
+        await supabase.auth.signOut();
+        return { success: false };
+      }
+    }
+    
+    toast.error('Login failed. User not found.');
+    return { success: false };
+  } catch (error: any) {
+    console.error('Login error in handleEmailLogin:', error);
+    throw error;
   }
-  
-  toast.error('Login failed. User not found.');
-  return { success: false };
 };
 
 /**
