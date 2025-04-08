@@ -1,4 +1,3 @@
-
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { UserType, UserData } from '@/types/auth-types';
@@ -6,10 +5,9 @@ import { UserType, UserData } from '@/types/auth-types';
 /**
  * Fetches user profile data from Supabase
  */
-export const fetchUserProfile = async (userId: string) => {
+export const fetchUserProfile = async (userId: string): Promise<{ aadhaar?: string } | null> => {
   try {
     // Note: Querying only columns that definitely exist in the database
-    // We removed has_fingerprints from the query until it's added to the database
     const { data: profileData, error } = await supabase
       .from('profiles')
       .select('aadhaar')
