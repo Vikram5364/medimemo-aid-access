@@ -1,3 +1,4 @@
+
 import { useState, useEffect, createContext, useContext, ReactNode } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
@@ -47,11 +48,11 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
               
               // Try to get Aadhaar from profile for individuals
               const profileData = await fetchUserProfile(session.user.id);
-              if (profileData) {
-                if (profileData.aadhaar) {
+              if (profileData && typeof profileData === 'object' && profileData !== null) {
+                if ('aadhaar' in profileData && profileData.aadhaar) {
                   setUserAadhaar(profileData.aadhaar);
                 }
-                // We can also check has_fingerprints here if needed
+                // We can add has_fingerprints check once the column is added
               }
             }
           }
@@ -83,11 +84,11 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
             
             // Retrieve Aadhaar if available for individuals
             const profileData = await fetchUserProfile(session.user.id);
-            if (profileData) {
-              if (profileData.aadhaar) {
+            if (profileData && typeof profileData === 'object' && profileData !== null) {
+              if ('aadhaar' in profileData && profileData.aadhaar) {
                 setUserAadhaar(profileData.aadhaar);
               }
-              // We can also use has_fingerprints here if needed
+              // We can add has_fingerprints check once the column is added
             }
           }
         } else {

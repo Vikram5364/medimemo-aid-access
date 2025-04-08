@@ -1,3 +1,4 @@
+
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { UserType, UserData } from '@/types/auth-types';
@@ -7,9 +8,11 @@ import { UserType, UserData } from '@/types/auth-types';
  */
 export const fetchUserProfile = async (userId: string) => {
   try {
+    // Note: Querying only columns that definitely exist in the database
+    // We removed has_fingerprints from the query until it's added to the database
     const { data: profileData, error } = await supabase
       .from('profiles')
-      .select('aadhaar, has_fingerprints')
+      .select('aadhaar')
       .eq('id', userId)
       .maybeSingle();
       
@@ -30,23 +33,27 @@ export const fetchUserProfile = async (userId: string) => {
  */
 export const updateUserProfile = async (userId: string, userData: UserData) => {
   try {
+    // Create an update object without has_fingerprints to avoid errors
+    const updateData = {
+      name: userData.name,
+      aadhaar: userData.aadhaar,
+      dob: userData.dob,
+      gender: userData.gender,
+      blood_group: userData.bloodGroup,
+      height: userData.height ? Number(userData.height) : null,
+      weight: userData.weight ? Number(userData.weight) : null,
+      contact: userData.contact,
+      address: userData.address,
+      emergency_contact_name: userData.emergencyContactName,
+      emergency_contact_relation: userData.emergencyContactRelation,
+      emergency_contact_number: userData.emergencyContactNumber,
+      // Remove has_fingerprints until column exists
+      // has_fingerprints: userData.hasFingerprints || false
+    };
+    
     const { error: profileError } = await supabase
       .from('profiles')
-      .update({
-        name: userData.name,
-        aadhaar: userData.aadhaar,
-        dob: userData.dob,
-        gender: userData.gender,
-        blood_group: userData.bloodGroup,
-        height: userData.height ? Number(userData.height) : null,
-        weight: userData.weight ? Number(userData.weight) : null,
-        contact: userData.contact,
-        address: userData.address,
-        emergency_contact_name: userData.emergencyContactName,
-        emergency_contact_relation: userData.emergencyContactRelation,
-        emergency_contact_number: userData.emergencyContactNumber,
-        has_fingerprints: userData.hasFingerprints || false
-      })
+      .update(updateData)
       .eq('id', userId);
       
     if (profileError) {
