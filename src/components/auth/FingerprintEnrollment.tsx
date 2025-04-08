@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { Check, Fingerprint, ArrowRight } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -30,25 +29,6 @@ const FingerprintEnrollment: React.FC<FingerprintEnrollmentProps> = ({ onComplet
   
   const totalFingerSteps = fingerPositionOrder.length;
 
-  // Auto scan the next fingerprint after a successful scan
-  const scanNextFingerprint = async () => {
-    if (currentFingerStep >= totalFingerSteps) {
-      return;
-    }
-    
-    await handleFingerScan();
-    
-    // If we have more fingerprints to scan and the last scan was successful,
-    // automatically start the next scan after a short delay
-    if (fingerprints.length > 0 && currentFingerStep < totalFingerSteps) {
-      setTimeout(() => {
-        if (currentFingerStep < totalFingerSteps) {
-          scanNextFingerprint();
-        }
-      }, 1500);
-    }
-  };
-
   // Handle fingerprint scan
   const handleFingerScan = async () => {
     if (isScanning || currentFingerStep >= totalFingerSteps) return;
@@ -67,6 +47,19 @@ const FingerprintEnrollment: React.FC<FingerprintEnrollmentProps> = ({ onComplet
       
       // Call the scanning function
       const fingerprintData = await scanFingerprint(fingerPosition);
+      
+      // Validate fingerprint quality
+      if (fingerprintData.quality < 40) {
+        setScanStatus('error');
+        toast.error(`Poor fingerprint quality. Please try again.`);
+        setTimeout(() => {
+          setScanStatus('idle');
+        }, 1500);
+        setIsScanning(false);
+        setScanningFinger(null);
+        return;
+      }
+      
       setLastScannedQuality(fingerprintData.quality);
       
       // Add to collected fingerprints
@@ -103,6 +96,25 @@ const FingerprintEnrollment: React.FC<FingerprintEnrollmentProps> = ({ onComplet
     }
   };
 
+  // Auto scan the next fingerprint after a successful scan
+  const scanNextFingerprint = async () => {
+    if (currentFingerStep >= totalFingerSteps) {
+      return;
+    }
+    
+    await handleFingerScan();
+    
+    // If we have more fingerprints to scan and the last scan was successful,
+    // automatically start the next scan after a short delay
+    if (fingerprints.length > 0 && currentFingerStep < totalFingerSteps && scanStatus === 'success') {
+      setTimeout(() => {
+        if (currentFingerStep < totalFingerSteps) {
+          scanNextFingerprint();
+        }
+      }, 1500);
+    }
+  };
+
   // Reset fingerprints
   const resetFingerprints = () => {
     setFingerprints([]);
@@ -118,11 +130,16 @@ const FingerprintEnrollment: React.FC<FingerprintEnrollmentProps> = ({ onComplet
     scanNextFingerprint();
   };
 
-  // Complete the fingerprint enrollment process
+  // Handle completion
   const handleComplete = () => {
+    // Ensure we have at least one fingerprint before completing
+    if (fingerprints.length === 0) {
+      toast.error("No fingerprints have been scanned. Please scan at least one fingerprint or skip.");
+      return;
+    }
     onComplete(fingerprints);
   };
-
+  
   const currentFingerPosition = currentFingerStep < totalFingerSteps 
     ? fingerPositionNames[fingerPositionOrder[currentFingerStep]] 
     : '';
@@ -166,7 +183,11 @@ const FingerprintEnrollment: React.FC<FingerprintEnrollmentProps> = ({ onComplet
           </div>
         ) : (
           <div className="flex flex-col sm:flex-row gap-3 justify-center mt-6">
-            <Button variant="outline" onClick={onSkip}>
+            <Button 
+              variant="outline" 
+              onClick={onSkip}
+              className="text-gray-500"
+            >
               Skip for Now
             </Button>
             {fingerprints.length === 0 ? (

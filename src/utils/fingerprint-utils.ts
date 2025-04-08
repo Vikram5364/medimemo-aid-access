@@ -66,10 +66,19 @@ export const scanFingerprint = async (position: FingerPosition): Promise<Fingerp
   // Generate a random template (in real app, this would be from the scanner)
   const template = btoa(`fingerprint_template_${position}_${Date.now()}`);
   
+  // Random number to simulate scan failure (about 15% chance)
+  const scanSuccessRate = Math.random();
+  if (scanSuccessRate > 0.85) {
+    throw new Error('Unable to scan fingerprint. Please try again.');
+  }
+  
+  // Generate a quality score between 30 and 100
+  const quality = Math.floor(Math.random() * 70) + 30;
+  
   // Return simulated fingerprint data
   return {
     position,
-    quality: Math.floor(Math.random() * 30) + 70, // Random quality between 70-100
+    quality,
     template
   };
 };

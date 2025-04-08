@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { z } from 'zod';
 import { useForm } from 'react-hook-form';
@@ -23,9 +22,7 @@ export const registerSchema = z.object({
   confirmPassword: z.string(),
   aadhaar: z
     .string()
-    .regex(/^\d{12}$/, { message: 'Aadhaar must be 12 digits' })
-    .optional()
-    .or(z.literal('')),
+    .regex(/^\d{12}$/, { message: 'Aadhaar must be 12 digits' }),
   dob: z.string().optional(),
   gender: z.string().optional(),
   bloodGroup: z.string().optional(),
@@ -199,7 +196,7 @@ const UserRegistrationForm: React.FC<UserRegistrationFormProps> = ({ onSubmit, i
           name="aadhaar"
           render={({ field }) => (
             <FormItem>
-              <FormLabel>Aadhaar Number (Optional)</FormLabel>
+              <FormLabel>Aadhaar Number <span className="text-red-500">*</span></FormLabel>
               <FormControl>
                 <Input placeholder="123456789012" {...field} />
               </FormControl>

@@ -10,7 +10,7 @@ export const fetchUserProfile = async (userId: string) => {
   try {
     const { data: profileData, error } = await supabase
       .from('profiles')
-      .select('aadhaar')
+      .select('aadhaar, has_fingerprints')
       .eq('id', userId)
       .maybeSingle();
       

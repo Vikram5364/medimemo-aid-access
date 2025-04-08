@@ -4,6 +4,7 @@ import { Check, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { formatFingerprintList } from '@/utils/fingerprint-scan-utils';
 import { FingerprintData } from '@/utils/fingerprint-utils';
+import { toast } from 'sonner';
 
 interface RegistrationCompleteProps {
   fingerprints: FingerprintData[];
@@ -21,6 +22,16 @@ const RegistrationComplete: React.FC<RegistrationCompleteProps> = ({
   const fingerprintsCount = fingerprints.length;
   const fingerprintsSummary = formatFingerprintList(fingerprints);
   
+  const handleComplete = () => {
+    // Ensure at least one fingerprint is enrolled
+    if (fingerprintsCount === 0) {
+      toast.error("Please enroll at least one fingerprint before completing registration.");
+      onBack(); // Go back to fingerprint enrollment
+      return;
+    }
+    onComplete();
+  };
+  
   return (
     <div className="space-y-6 text-center">
       <div>
@@ -31,7 +42,7 @@ const RegistrationComplete: React.FC<RegistrationCompleteProps> = ({
         <p className="text-sm text-muted-foreground mt-2">
           {fingerprintsCount > 0 
             ? `You've successfully enrolled ${fingerprintsCount} fingerprints.` 
-            : "You've skipped fingerprint enrollment."}
+            : "You need to enroll at least one fingerprint."}
         </p>
         {fingerprintsCount > 0 && (
           <p className="text-xs text-muted-foreground mt-1">
@@ -43,15 +54,15 @@ const RegistrationComplete: React.FC<RegistrationCompleteProps> = ({
       <div className="bg-blue-50 p-4 rounded-md text-sm text-blue-700">
         <p>Click "Complete Registration" to create your account.</p>
         {fingerprintsCount === 0 && (
-          <p className="mt-2">You can enroll your fingerprints later from your profile page.</p>
+          <p className="mt-2 text-red-600">At least one fingerprint is required for registration.</p>
         )}
       </div>
       
       <div className="flex flex-col space-y-3">
         <Button 
-          onClick={onComplete} 
+          onClick={handleComplete} 
           className="w-full" 
-          disabled={isLoading}
+          disabled={isLoading || fingerprintsCount === 0}
         >
           {isLoading ? (
             <>

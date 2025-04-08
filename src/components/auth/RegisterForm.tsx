@@ -34,19 +34,30 @@ const RegisterForm = () => {
 
   // Handle fingerprint completion
   const handleFingerprintComplete = (collectedFingerprints: FingerprintData[]) => {
+    if (collectedFingerprints.length === 0) {
+      toast.error("At least one fingerprint is required. Please scan a fingerprint.");
+      return;
+    }
+    
     setFingerprints(collectedFingerprints);
     setRegistrationStep('complete');
   };
 
-  // Skip fingerprint enrollment
+  // Skip fingerprint enrollment - removed as fingerprints are now required
   const skipFingerprints = () => {
-    // Just move to the registration completion
-    setRegistrationStep('complete');
+    toast.error("At least one fingerprint is required for registration.");
   };
 
   // Handle final registration after fingerprint collection
   const completeRegistration = async () => {
     if (!formData) return;
+    
+    // Validate that we have at least one fingerprint
+    if (fingerprints.length === 0) {
+      toast.error("At least one fingerprint is required for registration.");
+      setRegistrationStep('fingerprint');
+      return;
+    }
     
     try {
       // Directly register the user, bypassing email confirmation
