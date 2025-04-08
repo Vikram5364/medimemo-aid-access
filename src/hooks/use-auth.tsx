@@ -1,4 +1,3 @@
-
 import { useState, useEffect, createContext, useContext, ReactNode } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
@@ -48,8 +47,11 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
               
               // Try to get Aadhaar from profile for individuals
               const profileData = await fetchUserProfile(session.user.id);
-              if (profileData && profileData.aadhaar) {
-                setUserAadhaar(profileData.aadhaar);
+              if (profileData) {
+                if (profileData.aadhaar) {
+                  setUserAadhaar(profileData.aadhaar);
+                }
+                // We can also check has_fingerprints here if needed
               }
             }
           }
@@ -81,8 +83,11 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
             
             // Retrieve Aadhaar if available for individuals
             const profileData = await fetchUserProfile(session.user.id);
-            if (profileData && profileData.aadhaar) {
-              setUserAadhaar(profileData.aadhaar);
+            if (profileData) {
+              if (profileData.aadhaar) {
+                setUserAadhaar(profileData.aadhaar);
+              }
+              // We can also use has_fingerprints here if needed
             }
           }
         } else {
