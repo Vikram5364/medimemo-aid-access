@@ -59,10 +59,12 @@ export const useUserProfile = () => {
       }
       
       // Map allergies to the expected format
+      // Note: We're not accessing the 'reaction' property anymore since it doesn't exist in the database
       const allergies: Allergy[] = (allergiesData || []).map(allergy => ({
         name: allergy.name,
         severity: allergy.severity as 'mild' | 'moderate' | 'severe' || 'moderate',
-        reaction: allergy.reaction || undefined
+        // We'll set reaction as undefined since it's not in the database
+        reaction: undefined
       }));
       
       // Construct user profile from the data
@@ -161,7 +163,7 @@ export const useUserProfile = () => {
             user_id: userId,
             name: allergy.name,
             severity: allergy.severity || 'moderate',
-            reaction: allergy.reaction
+            // We don't insert reaction as it's not in the database schema
           }));
           
           const { error: allergyError } = await supabase
