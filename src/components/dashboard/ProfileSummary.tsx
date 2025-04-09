@@ -3,12 +3,19 @@ import React from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { UserProfile } from '@/types';
+import { useNavigate } from 'react-router-dom';
 
 interface ProfileSummaryProps {
   userProfile: UserProfile | null;
 }
 
 const ProfileSummary: React.FC<ProfileSummaryProps> = ({ userProfile }) => {
+  const navigate = useNavigate();
+  
+  const handleViewProfile = () => {
+    navigate('/profile');
+  };
+
   return (
     <Card className="mt-6">
       <CardHeader className="pb-2">
@@ -64,7 +71,7 @@ const ProfileSummary: React.FC<ProfileSummaryProps> = ({ userProfile }) => {
         </div>
       </CardContent>
       <CardFooter className="pt-0">
-        <Button variant="outline" size="sm" className="w-full">
+        <Button variant="outline" size="sm" className="w-full" onClick={handleViewProfile}>
           View Full Profile
         </Button>
       </CardFooter>

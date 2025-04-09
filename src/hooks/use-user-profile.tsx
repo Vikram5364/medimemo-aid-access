@@ -1,93 +1,184 @@
 
 import { useState, useEffect } from 'react';
-import { UserProfile } from '@/types';
+import { UserProfile, Allergy, MedicalCondition, Medication } from '@/types';
 import { toast } from 'sonner';
+import { supabase } from '@/integrations/supabase/client';
+import { useAuth } from '@/hooks/use-auth';
 
 export const useUserProfile = () => {
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-
-  // Load user profile from localStorage
-  const fetchProfile = () => {
+  const { isAuthenticated, userEmail, userAadhaar } = useAuth();
+  
+  // Load user profile from Supabase
+  const fetchProfile = async () => {
     setIsLoading(true);
     
     try {
-      // Get user-specific identifier
-      const userEmail = localStorage.getItem('userEmail');
-      const userAadhaar = localStorage.getItem('userAadhaar');
-      const userIdentifier = userEmail || userAadhaar || null;
-      
-      if (!userIdentifier) {
+      // Check if user is authenticated
+      if (!isAuthenticated) {
         setProfile(null);
         setIsLoading(false);
         return;
       }
       
-      setTimeout(() => {
-        const userData = localStorage.getItem('userData');
-        if (userData) {
-          try {
-            const parsedData = JSON.parse(userData);
-            // Extract relevant user data to construct a profile
-            const userProfile: UserProfile = {
-              id: parsedData.aadhaar || userIdentifier,
-              name: parsedData.name || 'Unknown User',
-              dob: parsedData.dob || '',
-              gender: parsedData.gender || '',
-              bloodGroup: parsedData.bloodGroup || '',
-              height: parsedData.height ? Number(parsedData.height) : undefined,
-              weight: parsedData.weight ? Number(parsedData.weight) : undefined,
-              contact: parsedData.contact || '',
-              address: parsedData.address || '',
-              emergencyContacts: [{
-                name: parsedData.emergencyContactName || '',
-                relationship: parsedData.emergencyContactRelation || '',
-                contact: parsedData.emergencyContactNumber || ''
-              }],
-              allergies: parsedData.allergies || [],
-              medicalConditions: parsedData.medicalConditions || [],
-              currentMedications: parsedData.medications || []
-            };
-            setProfile(userProfile);
-          } catch (error) {
-            console.error('Error parsing user data:', error);
-            setError('Failed to parse user profile data');
-          }
-        } else {
-          setProfile(null);
-        }
+      // Get user id from auth
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session?.user?.id) {
+        console.error('No user ID found');
+        setProfile(null);
         setIsLoading(false);
-      }, 500);
+        return;
+      }
+      
+      const userId = session.user.id;
+      
+      // Fetch profile data from Supabase
+      const { data: profileData, error: profileError } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('id', userId)
+        .single();
+        
+      if (profileError) {
+        console.error('Error fetching profile:', profileError);
+        setError('Failed to load user profile');
+        setIsLoading(false);
+        return;
+      }
+      
+      // Fetch allergies for the user
+      const { data: allergiesData, error: allergiesError } = await supabase
+        .from('allergies')
+        .select('*')
+        .eq('user_id', userId);
+        
+      if (allergiesError) {
+        console.error('Error fetching allergies:', allergiesError);
+      }
+      
+      // Map allergies to the expected format
+      const allergies: Allergy[] = (allergiesData || []).map(allergy => ({
+        name: allergy.name,
+        severity: allergy.severity as 'mild' | 'moderate' | 'severe' || 'moderate',
+        reaction: allergy.reaction || undefined
+      }));
+      
+      // Construct user profile from the data
+      if (profileData) {
+        const userProfile: UserProfile = {
+          id: profileData.id,
+          name: profileData.name || 'Unknown User',
+          dob: profileData.dob || '',
+          gender: profileData.gender || '',
+          bloodGroup: profileData.blood_group || '',
+          height: profileData.height ? Number(profileData.height) : undefined,
+          weight: profileData.weight ? Number(profileData.weight) : undefined,
+          contact: profileData.contact || '',
+          address: profileData.address || '',
+          emergencyContacts: [{
+            name: profileData.emergency_contact_name || '',
+            relationship: profileData.emergency_contact_relation || '',
+            contact: profileData.emergency_contact_number || ''
+          }],
+          allergies: allergies,
+          medicalConditions: [], // We'll add support for this later
+          currentMedications: []  // We'll add support for this later
+        };
+        
+        setProfile(userProfile);
+      } else {
+        setProfile(null);
+      }
     } catch (err) {
       console.error('Error fetching user profile:', err);
       setError('Failed to load user profile');
+    } finally {
       setIsLoading(false);
     }
   };
 
-  // Update user profile
-  const updateProfile = (updatedProfile: Partial<UserProfile>) => {
+  // Update user profile in Supabase
+  const updateProfile = async (updatedProfile: Partial<UserProfile>) => {
     try {
-      const userData = localStorage.getItem('userData');
-      const parsedData = userData ? JSON.parse(userData) : {};
+      // Get current user ID
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session?.user?.id) {
+        toast.error('You need to be logged in to update your profile');
+        return false;
+      }
       
-      // Update the user data with new profile information
-      const updatedData = {
-        ...parsedData,
-        ...updatedProfile,
-        // Handle nested objects
-        emergencyContactName: updatedProfile.emergencyContacts?.[0]?.name || parsedData.emergencyContactName,
-        emergencyContactRelation: updatedProfile.emergencyContacts?.[0]?.relationship || parsedData.emergencyContactRelation,
-        emergencyContactNumber: updatedProfile.emergencyContacts?.[0]?.contact || parsedData.emergencyContactNumber
-      };
+      const userId = session.user.id;
       
-      localStorage.setItem('userData', JSON.stringify(updatedData));
+      // Prepare data for update
+      const updateData: any = {};
       
-      // Update the current profile state
-      setProfile(prevProfile => {
-        if (!prevProfile) return updatedProfile as UserProfile;
-        return { ...prevProfile, ...updatedProfile };
+      // Map fields from UserProfile to database columns
+      if (updatedProfile.name !== undefined) updateData.name = updatedProfile.name;
+      if (updatedProfile.dob !== undefined) updateData.dob = updatedProfile.dob;
+      if (updatedProfile.gender !== undefined) updateData.gender = updatedProfile.gender;
+      if (updatedProfile.bloodGroup !== undefined) updateData.blood_group = updatedProfile.bloodGroup;
+      if (updatedProfile.height !== undefined) updateData.height = updatedProfile.height;
+      if (updatedProfile.weight !== undefined) updateData.weight = updatedProfile.weight;
+      if (updatedProfile.contact !== undefined) updateData.contact = updatedProfile.contact;
+      if (updatedProfile.address !== undefined) updateData.address = updatedProfile.address;
+      
+      // Emergency contacts
+      if (updatedProfile.emergencyContacts && updatedProfile.emergencyContacts.length > 0) {
+        const emergencyContact = updatedProfile.emergencyContacts[0];
+        updateData.emergency_contact_name = emergencyContact.name;
+        updateData.emergency_contact_relation = emergencyContact.relationship;
+        updateData.emergency_contact_number = emergencyContact.contact;
+      }
+      
+      // Update profile in database
+      const { error } = await supabase
+        .from('profiles')
+        .update(updateData)
+        .eq('id', userId);
+        
+      if (error) {
+        console.error('Error updating profile:', error);
+        toast.error('Failed to update profile');
+        return false;
+      }
+      
+      // If there are allergies to update
+      if (updatedProfile.allergies) {
+        // For simplicity, we'll replace all allergies
+        // In a real app, you might want to handle this more gracefully
+        
+        // First delete existing allergies
+        await supabase
+          .from('allergies')
+          .delete()
+          .eq('user_id', userId);
+          
+        // Then add new ones
+        if (updatedProfile.allergies.length > 0) {
+          const allergyInserts = updatedProfile.allergies.map(allergy => ({
+            user_id: userId,
+            name: allergy.name,
+            severity: allergy.severity || 'moderate',
+            reaction: allergy.reaction
+          }));
+          
+          const { error: allergyError } = await supabase
+            .from('allergies')
+            .insert(allergyInserts);
+            
+          if (allergyError) {
+            console.error('Error updating allergies:', allergyError);
+            toast.error('Failed to update allergies');
+          }
+        }
+      }
+      
+      // Update the local state
+      setProfile(prev => {
+        if (!prev) return updatedProfile as UserProfile;
+        return { ...prev, ...updatedProfile };
       });
       
       toast.success('Profile updated successfully');
@@ -101,23 +192,23 @@ export const useUserProfile = () => {
 
   // Load profile on component mount
   useEffect(() => {
-    fetchProfile();
-  }, []);
+    if (isAuthenticated) {
+      fetchProfile();
+    }
+  }, [isAuthenticated]);
 
   // Listen for authentication changes
   useEffect(() => {
-    const checkAuth = () => {
-      const isAuthenticated = localStorage.getItem('isAuthenticated') === 'true';
-      if (!isAuthenticated) {
-        setProfile(null);
-      } else {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event) => {
+      if (event === 'SIGNED_IN') {
         fetchProfile();
+      } else if (event === 'SIGNED_OUT') {
+        setProfile(null);
       }
-    };
+    });
 
-    window.addEventListener('storage', checkAuth);
     return () => {
-      window.removeEventListener('storage', checkAuth);
+      subscription.unsubscribe();
     };
   }, []);
 
