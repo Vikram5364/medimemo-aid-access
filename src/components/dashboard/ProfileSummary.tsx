@@ -4,17 +4,53 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { UserProfile } from '@/types';
 import { useNavigate } from 'react-router-dom';
+import { Skeleton } from '@/components/ui/skeleton';
 
 interface ProfileSummaryProps {
   userProfile: UserProfile | null;
+  isLoading?: boolean;
 }
 
-const ProfileSummary: React.FC<ProfileSummaryProps> = ({ userProfile }) => {
+const ProfileSummary: React.FC<ProfileSummaryProps> = ({ userProfile, isLoading = false }) => {
   const navigate = useNavigate();
   
   const handleViewProfile = () => {
     navigate('/profile');
   };
+
+  if (isLoading) {
+    return (
+      <Card className="mt-6">
+        <CardHeader className="pb-2">
+          <CardTitle className="text-sm font-medium">Medical Profile Summary</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="space-y-4">
+            <div>
+              <h4 className="text-xs font-medium text-gray-500">Blood Group</h4>
+              <Skeleton className="h-5 w-12 mt-1" />
+            </div>
+            <div>
+              <h4 className="text-xs font-medium text-gray-500">Allergies</h4>
+              <div className="flex gap-1 mt-1">
+                <Skeleton className="h-5 w-16" />
+                <Skeleton className="h-5 w-16" />
+              </div>
+            </div>
+            <div>
+              <h4 className="text-xs font-medium text-gray-500">Chronic Conditions</h4>
+              <Skeleton className="h-5 w-full mt-1" />
+            </div>
+          </div>
+        </CardContent>
+        <CardFooter className="pt-0">
+          <Button variant="outline" size="sm" className="w-full" disabled>
+            View Full Profile
+          </Button>
+        </CardFooter>
+      </Card>
+    );
+  }
 
   return (
     <Card className="mt-6">

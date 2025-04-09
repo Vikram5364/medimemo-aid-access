@@ -33,6 +33,7 @@ export const useUserProfile = () => {
       }
       
       const userId = session.user.id;
+      console.log('Fetching profile for user ID:', userId);
       
       // Fetch profile data from Supabase
       const { data: profileData, error: profileError } = await supabase
@@ -48,6 +49,8 @@ export const useUserProfile = () => {
         return;
       }
       
+      console.log('Retrieved profile data:', profileData);
+      
       // Fetch allergies for the user
       const { data: allergiesData, error: allergiesError } = await supabase
         .from('allergies')
@@ -58,8 +61,9 @@ export const useUserProfile = () => {
         console.error('Error fetching allergies:', allergiesError);
       }
       
+      console.log('Retrieved allergies data:', allergiesData);
+      
       // Map allergies to the expected format
-      // Note: We're not accessing the 'reaction' property anymore since it doesn't exist in the database
       const allergies: Allergy[] = (allergiesData || []).map(allergy => ({
         name: allergy.name,
         severity: allergy.severity as 'mild' | 'moderate' | 'severe' || 'moderate',
@@ -71,7 +75,7 @@ export const useUserProfile = () => {
       if (profileData) {
         const userProfile: UserProfile = {
           id: profileData.id,
-          name: profileData.name || 'Unknown User',
+          name: profileData.name || userEmail?.split('@')[0] || 'Unknown User',
           dob: profileData.dob || '',
           gender: profileData.gender || '',
           bloodGroup: profileData.blood_group || '',
@@ -89,9 +93,29 @@ export const useUserProfile = () => {
           currentMedications: []  // We'll add support for this later
         };
         
+        console.log('Constructed user profile:', userProfile);
         setProfile(userProfile);
       } else {
-        setProfile(null);
+        console.log('No profile data found, using default values');
+        // No profile found, but user is authenticated, create a minimal profile
+        const userProfile: UserProfile = {
+          id: userId,
+          name: userEmail?.split('@')[0] || 'Unknown User',
+          dob: '',
+          gender: '',
+          bloodGroup: '',
+          contact: '',
+          address: '',
+          emergencyContacts: [{
+            name: '',
+            relationship: '',
+            contact: ''
+          }],
+          allergies: [],
+          medicalConditions: [],
+          currentMedications: []
+        };
+        setProfile(userProfile);
       }
     } catch (err) {
       console.error('Error fetching user profile:', err);
@@ -112,6 +136,7 @@ export const useUserProfile = () => {
       }
       
       const userId = session.user.id;
+      console.log('Updating profile for user ID:', userId, 'with data:', updatedProfile);
       
       // Prepare data for update
       const updateData: any = {};
@@ -134,6 +159,8 @@ export const useUserProfile = () => {
         updateData.emergency_contact_number = emergencyContact.contact;
       }
       
+      console.log('Prepared update data:', updateData);
+      
       // Update profile in database
       const { error } = await supabase
         .from('profiles')
@@ -149,13 +176,16 @@ export const useUserProfile = () => {
       // If there are allergies to update
       if (updatedProfile.allergies) {
         // For simplicity, we'll replace all allergies
-        // In a real app, you might want to handle this more gracefully
         
         // First delete existing allergies
-        await supabase
+        const { error: deleteError } = await supabase
           .from('allergies')
           .delete()
           .eq('user_id', userId);
+          
+        if (deleteError) {
+          console.error('Error deleting existing allergies:', deleteError);
+        }
           
         // Then add new ones
         if (updatedProfile.allergies.length > 0) {
@@ -165,6 +195,8 @@ export const useUserProfile = () => {
             severity: allergy.severity || 'moderate',
             // We don't insert reaction as it's not in the database schema
           }));
+          
+          console.log('Inserting allergies:', allergyInserts);
           
           const { error: allergyError } = await supabase
             .from('allergies')
@@ -192,17 +224,23 @@ export const useUserProfile = () => {
     }
   };
 
-  // Load profile on component mount
+  // Load profile on component mount and when authentication state changes
   useEffect(() => {
     if (isAuthenticated) {
+      console.log('User is authenticated, fetching profile');
       fetchProfile();
+    } else {
+      console.log('User is not authenticated, clearing profile');
+      setProfile(null);
+      setIsLoading(false);
     }
   }, [isAuthenticated]);
 
   // Listen for authentication changes
   useEffect(() => {
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((event) => {
-      if (event === 'SIGNED_IN') {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      console.log('Auth state changed:', event);
+      if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') {
         fetchProfile();
       } else if (event === 'SIGNED_OUT') {
         setProfile(null);

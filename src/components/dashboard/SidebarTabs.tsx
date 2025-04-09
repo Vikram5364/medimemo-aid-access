@@ -8,9 +8,10 @@ import { UserProfile } from '@/types';
 
 interface SidebarTabsProps {
   userProfile: UserProfile | null;
+  isLoading?: boolean;
 }
 
-const SidebarTabs: React.FC<SidebarTabsProps> = ({ userProfile }) => {
+const SidebarTabs: React.FC<SidebarTabsProps> = ({ userProfile, isLoading = false }) => {
   return (
     <div>
       <Tabs defaultValue="alerts">
@@ -26,7 +27,7 @@ const SidebarTabs: React.FC<SidebarTabsProps> = ({ userProfile }) => {
         </TabsContent>
       </Tabs>
 
-      <ProfileSummary userProfile={userProfile} />
+      <ProfileSummary userProfile={userProfile} isLoading={isLoading} />
     </div>
   );
 };
